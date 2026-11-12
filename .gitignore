@@ -1,0 +1,51 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Local builds, device runs and execution logs
+**/build/
+*.log
+/docs/development/reports/runtime/
+# Early simulator fault capture; final native screenshots are committed
+/docs/development/reports/screenshots/home-android14.png
+
+# Local-only credentials, signing files and personal ledger data
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Local repository backups made before remote branch cleanup
+/.delivery-backups/
+
+# Personal IDE and agent settings are not application source
+/.idea/
+/.codex/
+/.agents/
+/.aws/
+.kotlin/
+
+# Local agent coordination notes; published plans live under docs/development
+/task_plan.md
+/findings.md
+/progress.md
