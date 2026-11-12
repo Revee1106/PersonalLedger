@@ -140,4 +140,4 @@ design/v1/            # 已确认的界面设计稿
 docs/development/     # 计划、验收清单、审查和阶段报告
 ```
 
-开发范围与验收标准见[开发计划](docs/development/开发计划.md)和[验收清单](docs/development/验收清单.md)。正式交付分支为`master`。
+开发范围与验收标准见[开发计划](docs/development/开发计划.md)和[验收清单](docs/development/验收清单.md)。正式交付分支为`master`，源码快照、分支和安装包核对记录见[M5交付核验](docs/development/reports/M5_交付核验.md)。
