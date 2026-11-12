@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PersonalLedger</string>
+    <string name="notification_listener_label">个人账本支付通知辅助</string>
+</resources>

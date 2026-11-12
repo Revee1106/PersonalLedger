@@ -1,0 +1,143 @@
+# 日常账本 · PersonalLedger
+
+一款面向个人日常使用的原生 Android 记账应用，采用 Kotlin 和 Jetpack Compose 开发。界面以暖白、黑灰为主，突出金额、账目与简单的确认操作。
+
+首版提供本地记账与支付通知辅助确认。手机号／微信登录和云同步需要后续接入服务；当前无需登录即可在本机使用。
+
+## 功能与进度
+
+| 能力 | 当前状态 |
+| --- | --- |
+| 本地账本 | SQLite持久化；首次启动为空账本 |
+| 收入、支出与转账 | 金额使用整数分；转账不计入收支统计 |
+| 手动记账 | 新增、编辑、删除；可选择账户、分类、日期并填写备注 |
+| 月度概览 | 本月支出、收入、结余、月份切换、月预算 |
+| 分类统计 | 按收入／支出查看月度分类金额 |
+| 支付通知辅助记账 | 识别候选、系统提醒、待确认列表、核对修改、确认或忽略；真实支付覆盖待实测 |
+| 手机号／微信登录 | 待接入真实认证服务与微信应用配置；当前使用本地模式 |
+| 云同步 | 尚未接入 |
+
+支付辅助记账依赖手机实际收到的可读系统通知。支持范围需要按设备与支付场景验证，不能保证覆盖微信、支付宝、淘宝、京东的每一笔支付。
+
+通知候选不会直接计入账本。隐藏金额、多个金额或不合法格式需要人工核对；退款、转账等不按消费处理。首版按来源、通知标识与事件时间区分候选，第三方通知缺少或改变事件标识时仍可能出现重复或漏识别，请与实际支付记录核对。
+
+候选显示的时间来自系统通知，可能与交易实际发生时间不同；确认时可以更正日期。手机没有发出可读支付通知时，需要手动记账。
+
+## 原生界面
+
+以下为Android14模拟器运行截图，首次启动为空账本：
+
+<img src="docs/development/reports/screenshots/final-home-android14.png" alt="原生账本首页" width="280">
+<img src="docs/development/reports/screenshots/settings-android14.png" alt="通知授权与本地模式设置" width="280">
+
+## 界面设计稿
+
+以下是已确认的设计稿，**不是原生 App 的运行截图**。
+
+[首页、记账与统计设计稿](design/v1/images/01-core-screens.png) · [登录与支付提醒设计稿](design/v1/images/02-login-and-reminder.png)
+
+下载仓库后，使用浏览器打开[可交互设计原型](design/v1/index.html)，或查看[设计说明](design/v1/设计说明.md)。原型中的验证码和示例数据仅用于设计演示，不会用于正式认证或注入本地账本。
+
+## 开发环境
+
+| 项目 | 当前配置 |
+| --- | --- |
+| 语言与界面 | Kotlin、Jetpack Compose、Material 3 |
+| 最低 Android 版本 | Android 8.0，API 26 |
+| 编译／目标 SDK | API 37 |
+| JDK | 21 |
+| Gradle | 9.6.0，使用项目Wrapper |
+| Android Gradle Plugin | 9.5.1 |
+| 本地存储 | SQLiteOpenHelper |
+
+建议使用支持项目当前工具链的 Android Studio，并安装对应 Android SDK。SDK位置由本机的`local.properties`或开发环境提供；该文件不会提交至仓库。
+
+## 构建与运行
+
+克隆仓库后，在项目根目录执行：
+
+```powershell
+git clone --branch master https://github.com/Revee1106/PersonalLedger.git
+cd PersonalLedger
+.\gradlew.bat :app:assembleDebug
+```
+
+macOS／Linux：
+
+```sh
+./gradlew :app:assembleDebug
+```
+
+Debug安装包输出到：
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+连接安卓设备或启动模拟器后，可在Android Studio中运行`app`，或执行：
+
+```powershell
+.\gradlew.bat :app:installDebug
+```
+
+应用包名为`com.eric.personalledger`。本地模式直接打开账本，无需先配置第三方登录。
+
+Debug 包用于本地体验和开发验证；如需正式分发，应使用自己的签名配置构建 Release 包。签名密钥不应提交到仓库。
+
+## 首次使用
+
+1. 打开本地账本，点击底部“记一笔”，选择支出、收入或账户转账。
+2. 输入金额，选择账户与分类，按需填写备注，再保存。
+3. 在首页切换月份、设置月预算；从账目进入修改或删除，统计页查看对应月份的分类汇总。
+
+初始账本不含演示流水，默认提供“现金”和“银行卡”账户。转账仅改变账户余额，不计入收入或支出。
+
+## 开启支付通知辅助记账
+
+1. 点击首页右上角“账”进入设置，阅读用途说明，再选择“前往系统设置开启”，为PersonalLedger开启通知访问。
+2. 在“应用内提醒”中允许发送本地提醒；Android13及以上会单独请求通知权限。可以通过“管理提醒设置”调整系统通知和渠道。
+3. 手机收到可识别的微信／支付宝支付通知后，App保存待确认候选并尝试发送通用提醒。点击提醒或首页“去看看”，核对金额、分类、账户、日期和备注，再确认或忽略。
+
+通知访问与发送提醒可分别撤销。关闭发送提醒后，已识别候选仍可在App内查看；关闭通知访问后，手动记账继续可用。系统未提供通知、隐藏内容或识别不确定时，请手动核对补记。
+
+## 测试与检查
+
+```powershell
+# 本地单元测试
+.\gradlew.bat :app:testDebugUnitTest
+
+# Android静态检查
+.\gradlew.bat :app:lintDebug
+
+# 仪器测试，需要在线设备
+.\gradlew.bat :app:connectedDebugAndroidTest
+```
+
+10项JVM测试已通过；Android14模拟器上7项数据库仪器测试与1项应用上下文测试通过，覆盖金额、收支、转账、月界线、通知解析边界、持久化和通知事件重放。Lint为0 errors、18 warnings、3 hints；保留了依赖升级和代码风格等警告。界面操作验收另见[开发报告](docs/development/reports/)。
+
+真实原生UI已验证新增12.50、编辑为15.00、关闭并重启后持久化、删除后恢复空账本，以及统计和日期操作；360dp、1.2倍字体下验证了设置页滚动及授权按钮可达，之后恢复原配置。完整过程与安装包哈希见[M4集成验收](docs/development/reports/M4_集成验收.md)。
+
+## 数据与隐私
+
+- 账目保存在应用私有SQLite数据库，当前不上传至服务器。
+- 收入、支出与账户转账分别建模，避免转账被重复计为消费。
+- 待确认消费与正式账本分开保存，只有确认后计入收支。
+- 应用关闭系统账本备份，不依赖系统云备份恢复数据；当前尚无云同步，卸载应用会删除本地账本。
+- 通知辅助记账需要用户明确开启通知访问，可在系统设置撤销；Android13及以上还需单独允许本App发送提醒。拒绝提醒不会阻止候选保存在App内。
+- 密钥、签名文件、本地账本、`local.properties`和构建缓存不进入版本控制。
+
+## 项目结构
+
+```text
+app/src/main/java/com/eric/personalledger/
+├── data/        # 本地数据库、仓储与候选状态
+├── domain/      # 金额、收支规则、通知解析
+├── notifications/ # 通知来源过滤与本地系统提醒
+└── ui/          # 原生Compose页面与主题
+app/src/test/         # JVM业务测试
+app/src/androidTest/  # Android数据库与设备测试
+design/v1/            # 已确认的界面设计稿
+docs/development/     # 计划、验收清单、审查和阶段报告
+```
+
+开发范围与验收标准见[开发计划](docs/development/开发计划.md)和[验收清单](docs/development/验收清单.md)。正式交付分支为`master`。

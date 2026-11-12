@@ -1,0 +1,163 @@
+{
+  "checks": [
+    "金额键盘、分类选择、备注、保存及账本金额更新",
+    "保存后统计同步、支出和收入切换",
+    "支付提醒修改后预填金额、分类和备注",
+    "手机号格式、模拟验证码、协议勾选和登录演示",
+    "提醒确认后返回账本",
+    "待确认消费列表与忽略"
+  ],
+  "layouts": [
+    {
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "page": "home",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "page": "add",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "page": "stats",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "page": "login",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "page": "notification",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 360,
+        "height": 800
+      },
+      "page": "home",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 360,
+        "height": 800
+      },
+      "page": "add",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 360,
+        "height": 800
+      },
+      "page": "stats",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 360,
+        "height": 800
+      },
+      "page": "login",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 360,
+        "height": 800
+      },
+      "page": "notification",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 412,
+        "height": 915
+      },
+      "page": "home",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 412,
+        "height": 915
+      },
+      "page": "add",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 412,
+        "height": 915
+      },
+      "page": "stats",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 412,
+        "height": 915
+      },
+      "page": "login",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    },
+    {
+      "size": {
+        "width": 412,
+        "height": 915
+      },
+      "page": "notification",
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "overflow": []
+    }
+  ],
+  "browserErrors": []
+}
