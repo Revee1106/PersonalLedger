@@ -20,6 +20,10 @@ local.properties
 /docs/development/reports/runtime/
 # Early simulator fault capture; final native screenshots are committed
 /docs/development/reports/screenshots/home-android14.png
+# Keep M7 acceptance screenshots local after public-upload privacy review
+/docs/development/reports/screenshots/desktop-card-android17.png
+/docs/development/reports/screenshots/desktop-entry-android17.png
+/docs/development/reports/screenshots/desktop-saved-android17.png
 
 # Local-only credentials, signing files and personal ledger data
 .env

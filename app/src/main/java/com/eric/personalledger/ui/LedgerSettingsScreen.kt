@@ -36,6 +36,8 @@ private val Card = Color(0xFFF0F0EA)
 
 @Composable
 fun LedgerSettingsScreen(
+    widgetMessage: String?,
+    onAddDesktopWidget: () -> Unit,
     notificationAccessEnabled: Boolean,
     reminderPermissionGranted: Boolean,
     remindersEnabled: Boolean,
@@ -43,6 +45,7 @@ fun LedgerSettingsScreen(
     onOpenNotificationSettings: () -> Unit,
     onOpenAppNotificationSettings: () -> Unit,
     onReminderPermissionResult: () -> Unit,
+    onOpenPageProbe: () -> Unit,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -65,6 +68,42 @@ fun LedgerSettingsScreen(
                 Text(errorMessage, color = Color(0xFF9A4742), fontSize = 12.sp)
             }
             Spacer(Modifier.height(19.dp))
+            Surface(color = Card, shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(17.dp)) {
+                    Text("桌面记账卡片", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "在手机桌面放一张「记一笔」卡片，点击直接输入金额。无需通知或无障碍授权。",
+                        color = Muted,
+                        fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = onAddDesktopWidget, modifier = Modifier.fillMaxWidth()) {
+                        Text("添加到桌面")
+                    }
+                    Text(
+                        widgetMessage ?: "也可长按桌面空白处，从小组件或窗口小工具中选择本应用的「记一笔」。",
+                        color = Muted,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Surface(color = Card, shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(17.dp)) {
+                    Text("付款页面读取验证", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "通知无法覆盖的付款场景，可手动验证页面能否读取。每次五分钟，仅展示本机读取结果，暂不自动记账。",
+                        color = Muted,
+                        fontSize = 12.sp,
+                    )
+                    TextButton(onClick = onOpenPageProbe, modifier = Modifier.fillMaxWidth()) {
+                        Text("进入验证")
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
             Surface(color = Card, shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.fillMaxWidth().padding(17.dp)) {
                     Text("账户", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -95,7 +134,7 @@ fun LedgerSettingsScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "仅尝试识别微信支付和支付宝通知。识别结果会先进入待确认列表；确认后才记入账本。通知全文仅在内存中解析，不保存。",
+                        "作为补充渠道，仅尝试识别微信支付和支付宝已发出的系统通知。没有系统通知的付款无法通过此入口识别。识别结果先进入待确认列表。",
                         color = Muted,
                         fontSize = 12.sp,
                     )
@@ -152,7 +191,7 @@ fun LedgerSettingsScreen(
             }
             Spacer(Modifier.height(14.dp))
             Text(
-                "手动记账无需开启通知访问。应用不读取短信，不使用无障碍服务或悬浮窗。",
+                "手动记账无需开启通知访问或无障碍。页面读取验证需单独授权并手动启动；应用不读取短信，不使用悬浮窗。",
                 color = Muted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 3.dp),

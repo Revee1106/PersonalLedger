@@ -2,6 +2,7 @@ package com.eric.personalledger
 
 import android.Manifest
 import android.app.NotificationManager
+import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
@@ -10,13 +11,18 @@ import android.os.Build
 import android.os.Bundle
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.eric.personalledger.data.CandidateConfirmationResult
 import com.eric.personalledger.data.PendingLedgerCandidate
 import com.eric.personalledger.data.SqliteLedgerRepository
@@ -31,9 +37,13 @@ import com.eric.personalledger.ui.LedgerSettingsScreen
 import com.eric.personalledger.ui.LedgerStatisticsScreen
 import com.eric.personalledger.ui.LedgerTab
 import com.eric.personalledger.ui.PendingReviewScreen
+import com.eric.personalledger.ui.PageProbeScreen
+import com.eric.personalledger.accessibility.PaymentPageProbeService
+import com.eric.personalledger.accessibility.PageProbeStore
 import com.eric.personalledger.ui.theme.PersonalLedgerTheme
 import com.eric.personalledger.notifications.PaymentNotificationListenerService
 import com.eric.personalledger.notifications.PendingReviewNotifier
+import com.eric.personalledger.widgets.QuickEntryWidgetProvider
 import java.time.YearMonth
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
@@ -47,8 +57,14 @@ class MainActivity : ComponentActivity() {
     private var selectedMonth by mutableStateOf(YearMonth.now())
     private var homeState by mutableStateOf<LedgerHomeState>(LedgerHomeState.Loading)
     private var showEntryForm by mutableStateOf(false)
+    private var entryFormSession by mutableStateOf(0)
+    private var focusEntryAmount by mutableStateOf(false)
+    private var widgetMessage by mutableStateOf<String?>(null)
+    private val launchState by lazy { ViewModelProvider(this)[LaunchState::class.java] }
     private var showPendingReview by mutableStateOf(false)
     private var showSettings by mutableStateOf(false)
+    private var showPageProbe by mutableStateOf(false)
+    private var pageProbeAccessEnabled by mutableStateOf(false)
     private var selectedTab by mutableStateOf(LedgerTab.LEDGER)
     private var editingEntry by mutableStateOf<LedgerEntry?>(null)
     private var formError by mutableStateOf<String?>(null)
@@ -68,20 +84,37 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        entryFormSession = savedInstanceState?.getInt(STATE_ENTRY_SESSION) ?: 0
+        if (savedInstanceState?.getBoolean(STATE_NEW_ENTRY_OPEN) == true) {
+            showEntryForm = true
+            focusEntryAmount = savedInstanceState.getBoolean(STATE_FOCUS_AMOUNT)
+        }
         enableEdgeToEdge()
         setContent {
             PersonalLedgerTheme(darkTheme = false, dynamicColor = false) {
-                if (showEntryForm) {
-                    val loaded = homeState as? LedgerHomeState.Loaded
-                    LedgerEntryFormScreen(
-                        accounts = loaded?.accounts.orEmpty(),
-                        initialEntry = editingEntry,
-                        errorMessage = formError,
-                        isSaving = isSavingEntry,
-                        onBack = { showEntryForm = false },
-                        onSave = ::saveEntry,
-                        onDelete = ::deleteEntry,
+                if (showPageProbe) {
+                    PageProbeScreen(
+                        accessEnabled = pageProbeAccessEnabled,
+                        errorMessage = settingsError,
+                        onOpenAccessibilitySettings = ::openAccessibilitySettings,
+                        onBack = { showPageProbe = false },
                     )
+                } else if (showEntryForm) {
+                    val loaded = homeState as? LedgerHomeState.Loaded
+                    key(entryFormSession) {
+                        LedgerEntryFormScreen(
+                            accounts = loaded?.accounts.orEmpty(),
+                            initialEntry = editingEntry,
+                            errorMessage = formError,
+                            accountsLoading = homeState == LedgerHomeState.Loading,
+                            onRetryAccounts = if (homeState == LedgerHomeState.Failed) ::loadMonth else null,
+                            autoFocusAmount = focusEntryAmount,
+                            isSaving = isSavingEntry,
+                            onBack = { showEntryForm = false },
+                            onSave = ::saveEntry,
+                            onDelete = ::deleteEntry,
+                        )
+                    }
                 } else if (showPendingReview) {
                     PendingReviewScreen(
                         candidates = pendingCandidates,
@@ -98,6 +131,8 @@ class MainActivity : ComponentActivity() {
                     )
                 } else if (showSettings) {
                     LedgerSettingsScreen(
+                        widgetMessage = widgetMessage,
+                        onAddDesktopWidget = ::addDesktopWidget,
                         notificationAccessEnabled = notificationAccessEnabled,
                         reminderPermissionGranted = reminderPermissionGranted,
                         remindersEnabled = remindersEnabled,
@@ -105,6 +140,10 @@ class MainActivity : ComponentActivity() {
                         onOpenNotificationSettings = ::openNotificationListenerSettings,
                         onOpenAppNotificationSettings = ::openAppNotificationSettings,
                         onReminderPermissionResult = ::refreshNotificationAccess,
+                        onOpenPageProbe = {
+                            settingsError = null
+                            showPageProbe = true
+                        },
                         onBack = { showSettings = false },
                     )
                 } else if (selectedTab == LedgerTab.LEDGER) {
@@ -116,12 +155,10 @@ class MainActivity : ComponentActivity() {
                             loadMonth()
                         },
                         onRetry = ::loadMonth,
-                        onAddEntry = {
-                            editingEntry = null
-                            formError = null
-                            showEntryForm = true
-                        },
+                        onAddEntry = { openNewEntry() },
                         onEditEntry = { entry ->
+                            entryFormSession++
+                            focusEntryAmount = false
                             editingEntry = entry
                             formError = null
                             showEntryForm = true
@@ -144,32 +181,85 @@ class MainActivity : ComponentActivity() {
                         },
                         onRetry = ::loadMonth,
                         onOpenLedger = { selectedTab = LedgerTab.LEDGER },
-                        onAddEntry = {
-                            editingEntry = null
-                            formError = null
-                            showEntryForm = true
-                        },
+                        onAddEntry = { openNewEntry() },
                     )
                 }
             }
         }
         loadMonth()
         refreshNotificationAccess()
-        if (intent?.getBooleanExtra(EXTRA_OPEN_PENDING_REVIEW, false) == true) {
-            openPendingReview()
+        if (!launchState.intentHandled && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) {
+            handleLaunchIntent(intent)
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra(EXTRA_OPEN_PENDING_REVIEW, false)) {
-            openPendingReview()
+        launchState.intentHandled = false
+        handleLaunchIntent(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt(STATE_ENTRY_SESSION, entryFormSession)
+        outState.putBoolean(STATE_NEW_ENTRY_OPEN, showEntryForm && editingEntry == null)
+        outState.putBoolean(STATE_FOCUS_AMOUNT, focusEntryAmount)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun handleLaunchIntent(launchIntent: Intent?) {
+        when {
+            launchIntent?.action == ACTION_ADD_ENTRY -> openNewEntry(fromWidget = true)
+            launchIntent?.getBooleanExtra(EXTRA_OPEN_PENDING_REVIEW, false) == true -> openPendingReview()
+            else -> return
+        }
+        // Keep the launch intent stable for lifecycle observers, but consume its navigation once.
+        // Rotating after a save must not open another empty entry.
+        launchState.intentHandled = true
+    }
+
+    private fun openNewEntry(fromWidget: Boolean = false) {
+        // A second widget tap resumes a draft instead of silently erasing it.
+        if (showEntryForm || isSavingEntry) return
+        entryFormSession++
+        editingEntry = null
+        formError = null
+        focusEntryAmount = fromWidget
+        showSettings = false
+        showPageProbe = false
+        showPendingReview = false
+        selectedTab = LedgerTab.LEDGER
+        showEntryForm = true
+        if (fromWidget && selectedMonth != YearMonth.now()) {
+            selectedMonth = YearMonth.now()
+            loadMonth()
+        } else if (homeState == LedgerHomeState.Failed) {
+            loadMonth()
+        }
+    }
+
+    private fun addDesktopWidget() {
+        val manager = AppWidgetManager.getInstance(this)
+        widgetMessage = if (!manager.isRequestPinAppWidgetSupported) {
+            "当前桌面不支持应用内添加。请长按桌面空白处，在小组件或窗口小工具中选择本应用的「记一笔」。"
+        } else {
+            try {
+                val accepted = manager.requestPinAppWidget(
+                    ComponentName(this, QuickEntryWidgetProvider::class.java), null, null,
+                )
+                if (accepted) "请在系统弹窗中确认添加。若没有弹窗，也可从桌面的小组件列表添加。"
+                else "桌面未接受添加请求，请从桌面的小组件列表手动添加。"
+            } catch (_: IllegalStateException) {
+                "请从桌面的小组件列表手动添加「记一笔」。"
+            } catch (_: SecurityException) {
+                "请从桌面的小组件列表手动添加「记一笔」。"
+            }
         }
     }
 
     override fun onResume() {
         super.onResume()
+        PageProbeStore.expireIfNeeded()
         refreshNotificationAccess()
         if (showPendingReview) {
             if (pendingBusyCandidateId == null && !pendingLoading) loadPendingCandidates()
@@ -373,6 +463,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refreshNotificationAccess() {
+        val accessibilityManager = getSystemService(AccessibilityManager::class.java)
+        val probeService = ComponentName(this, PaymentPageProbeService::class.java)
+        pageProbeAccessEnabled = accessibilityManager
+            .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            .any { info ->
+                val service = info.resolveInfo.serviceInfo
+                ComponentName(service.packageName, service.name) == probeService
+            }
         val listener = ComponentName(this, PaymentNotificationListenerService::class.java)
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationAccessEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -397,6 +495,15 @@ class MainActivity : ComponentActivity() {
             notificationManager.areNotificationsEnabled() && channelEnabled
     }
 
+    private fun openAccessibilitySettings() {
+        settingsError = null
+        try {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        } catch (_: ActivityNotFoundException) {
+            settingsError = "此设备无法打开无障碍设置，请在系统设置中查找。"
+        }
+    }
+
     private fun openNotificationListenerSettings() {
         settingsError = null
         try {
@@ -419,6 +526,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openPendingReview() {
+        showPageProbe = false
         showEntryForm = false
         showSettings = false
         showPendingReview = true
@@ -426,7 +534,17 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        const val ACTION_ADD_ENTRY = "com.eric.personalledger.ADD_ENTRY"
+        private const val STATE_ENTRY_SESSION = "entry_form_session"
+        private const val STATE_NEW_ENTRY_OPEN = "new_entry_open"
+        private const val STATE_FOCUS_AMOUNT = "focus_entry_amount"
         const val ACTION_OPEN_PENDING_REVIEW = "com.eric.personalledger.OPEN_PENDING_REVIEW"
         const val EXTRA_OPEN_PENDING_REVIEW = "open_pending_review"
+    }
+
+    // Survives configuration changes, but must reset after process death so a fresh
+    // desktop click is not swallowed by a flag restored from an old dashboard.
+    class LaunchState : ViewModel() {
+        var intentHandled = false
     }
 }

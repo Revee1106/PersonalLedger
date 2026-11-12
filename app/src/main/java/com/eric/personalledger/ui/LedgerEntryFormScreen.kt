@@ -27,14 +27,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -62,33 +70,48 @@ fun LedgerEntryFormScreen(
     onBack: () -> Unit,
     onSave: (LedgerEntry) -> Unit,
     onDelete: (LedgerEntry) -> Unit,
+    accountsLoading: Boolean = false,
+    onRetryAccounts: (() -> Unit)? = null,
+    autoFocusAmount: Boolean = false,
 ) {
     BackHandler(enabled = !isSaving, onBack = onBack)
     val context = LocalContext.current
+    val amountFocusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    var amountFocusRequested by remember { mutableStateOf(false) }
+    LaunchedEffect(autoFocusAmount, windowFocused) {
+        if (autoFocusAmount && windowFocused && !amountFocusRequested) {
+            withFrameNanos { }
+            amountFocusRequester.requestFocus()
+            keyboard?.show()
+            amountFocusRequested = true
+        }
+    }
     val zone = remember { ZoneId.systemDefault() }
-    val originalTimestamp = remember(initialEntry?.id) {
+    val originalTimestamp = rememberSaveable(initialEntry?.id) {
         initialEntry?.occurredAtEpochMillis ?: System.currentTimeMillis()
     }
     val originalLocalTime = remember(initialEntry?.id) {
         Instant.ofEpochMilli(originalTimestamp).atZone(zone).toLocalTime()
     }
-    var selectedDate by remember(initialEntry?.id) {
+    var selectedDate by rememberSaveable(initialEntry?.id) {
         mutableStateOf(Instant.ofEpochMilli(originalTimestamp).atZone(zone).toLocalDate())
     }
-    var type by remember(initialEntry?.id) {
+    var type by rememberSaveable(initialEntry?.id) {
         mutableStateOf(initialEntry?.type ?: EntryType.EXPENSE)
     }
-    var amountText by remember(initialEntry?.id) {
+    var amountText by rememberSaveable(initialEntry?.id) {
         mutableStateOf(initialEntry?.amountCents?.let(MoneyInput::formatCents).orEmpty())
     }
-    var category by remember(initialEntry?.id) {
+    var category by rememberSaveable(initialEntry?.id) {
         mutableStateOf(initialEntry?.category ?: "餐饮")
     }
-    var memo by remember(initialEntry?.id) { mutableStateOf(initialEntry?.memo.orEmpty()) }
-    var accountId by remember(initialEntry?.id, accounts) {
+    var memo by rememberSaveable(initialEntry?.id) { mutableStateOf(initialEntry?.memo.orEmpty()) }
+    var accountId by rememberSaveable(initialEntry?.id) {
         mutableStateOf(initialEntry?.accountId ?: accounts.firstOrNull()?.id ?: 0L)
     }
-    var targetAccountId by remember(initialEntry?.id, accounts) {
+    var targetAccountId by rememberSaveable(initialEntry?.id) {
         mutableStateOf(
             initialEntry?.transferTargetAccountId
                 ?: accounts.firstOrNull { it.id != accountId }?.id
@@ -96,6 +119,15 @@ fun LedgerEntryFormScreen(
         )
     }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(accounts) {
+        if (accounts.isNotEmpty()) {
+            if (accounts.none { it.id == accountId }) accountId = accounts.first().id
+            if (accounts.none { it.id == targetAccountId } || targetAccountId == accountId) {
+                targetAccountId = accounts.firstOrNull { it.id != accountId }?.id ?: 0L
+            }
+        }
+    }
 
     val parsedCents = MoneyInput.parseCents(amountText)
     val trimmedCategory = category.trim()
@@ -157,7 +189,7 @@ fun LedgerEntryFormScreen(
             OutlinedTextField(
                 value = amountText,
                 onValueChange = { amountText = it.take(24) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(amountFocusRequester).testTag("entry_amount"),
                 placeholder = { Text("0.00") },
                 prefix = { Text("¥ ", color = FormMuted) },
                 singleLine = true,
@@ -214,6 +246,11 @@ fun LedgerEntryFormScreen(
 
             Spacer(Modifier.height(18.dp))
             Text(if (type == EntryType.TRANSFER) "转出账户" else "账户", color = FormMuted, fontSize = 13.sp)
+            if (accountsLoading) Text("正在读取账户…", color = FormMuted, fontSize = 12.sp)
+            if (onRetryAccounts != null) {
+                Text("账户读取失败，请重试后保存。", color = Color(0xFF9A4742), fontSize = 12.sp)
+                TextButton(onClick = onRetryAccounts) { Text("重试读取账户") }
+            }
             AccountPicker(
                 accounts = accounts,
                 selectedId = accountId,
@@ -276,6 +313,7 @@ fun LedgerEntryFormScreen(
                 },
                 enabled = canSave && !isSaving,
                 modifier = Modifier
+                    .testTag("entry_save")
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(16.dp),
