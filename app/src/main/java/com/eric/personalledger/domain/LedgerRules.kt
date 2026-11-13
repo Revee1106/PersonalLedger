@@ -35,7 +35,9 @@ object LedgerRules {
             .filter { it.type == type }
             .forEach { entry ->
                 require(entry.amountCents > 0L) { "Ledger amounts must be positive." }
-                totals[entry.category] = Math.addExact(totals[entry.category] ?: 0L, entry.amountCents)
+                entry.categoryTags.forEach { tag ->
+                    totals[tag] = Math.addExact(totals[tag] ?: 0L, entry.amountCents)
+                }
             }
         return totals.map { (category, amount) -> MonthlyCategoryTotal(category, amount) }
             .sortedByDescending { it.amountCents }

@@ -24,7 +24,10 @@ data class LedgerEntry(
     val memo: String = "",
     val transferTargetAccountId: Long? = null,
     val candidateId: String? = null,
-)
+    val additionalCategories: List<String> = emptyList(),
+) {
+    val categoryTags: List<String> get() = CategoryTags.normalize(listOf(category) + additionalCategories)
+}
 
 data class MonthlySummary(
     val expenseCents: Long,
