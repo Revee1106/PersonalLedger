@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteOpenHelper
 import com.eric.personalledger.domain.EntryType
+import com.eric.personalledger.domain.CategoryTags
 import com.eric.personalledger.domain.LedgerAccount
 import com.eric.personalledger.domain.LedgerEntry
 import com.eric.personalledger.domain.LedgerRules
@@ -53,6 +54,12 @@ class SqliteLedgerRepository(
     databaseName: String = DATABASE_NAME,
 ) : AutoCloseable {
     private val helper = LedgerDatabaseHelper(context.applicationContext, databaseName)
+
+    fun categoryTags(): List<String> = helper.readableDatabase.rawQuery(
+        "SELECT name FROM category_tags ORDER BY name ASC", null,
+    ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
+
+    fun commonCategoryTags(type: EntryType): List<String> = CategoryTags.common(allEntries(), type)
 
     fun accounts(): List<LedgerAccount> = helper.readableDatabase.rawQuery(
         "SELECT id, name FROM accounts ORDER BY id ASC",
@@ -129,6 +136,7 @@ class SqliteLedgerRepository(
         db.beginTransaction()
         try {
             db.insertOrThrow("ledger_entries", null, entry.toContentValues())
+            replaceTags(db, entry)
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
@@ -137,12 +145,16 @@ class SqliteLedgerRepository(
 
     fun updateEntry(entry: LedgerEntry): Boolean {
         validateEntry(entry)
-        return helper.writableDatabase.update(
-            "ledger_entries",
-            entry.toContentValues(),
-            "id = ?",
-            arrayOf(entry.id),
-        ) == 1
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            val updated = db.update("ledger_entries", entry.toContentValues(), "id = ?", arrayOf(entry.id)) == 1
+            if (updated) replaceTags(db, entry)
+            db.setTransactionSuccessful()
+            return updated
+        } finally {
+            db.endTransaction()
+        }
     }
 
     fun deleteEntry(entryId: String): Boolean =
@@ -240,6 +252,7 @@ class SqliteLedgerRepository(
                 return CandidateConfirmationResult.ALREADY_PROCESSED
             }
             db.insertOrThrow("ledger_entries", null, entry.toContentValues())
+            replaceTags(db, entry)
             val changed = db.update(
                 "notification_candidates",
                 ContentValues().apply { put("status", CandidateStatus.CONFIRMED.name) },
@@ -269,6 +282,7 @@ class SqliteLedgerRepository(
         require(entry.category.isNotBlank() && entry.category.length <= MAX_CATEGORY_LENGTH) {
             "Category must contain 1 to $MAX_CATEGORY_LENGTH characters."
         }
+        CategoryTags.normalize(listOf(entry.category) + entry.additionalCategories)
         when (entry.type) {
             EntryType.TRANSFER -> require(
                 entry.transferTargetAccountId != null && entry.transferTargetAccountId != entry.accountId,
@@ -311,7 +325,7 @@ class SqliteLedgerRepository(
         put("id", id)
         put("type", type.name)
         put("amount_cents", amountCents)
-        put("category", category)
+        put("category", categoryTags.first())
         put("account_id", accountId)
         if (transferTargetAccountId == null) putNull("target_account_id")
         else put("target_account_id", transferTargetAccountId)
@@ -353,8 +367,31 @@ class SqliteLedgerRepository(
         return if (isNull(index)) null else getString(index)
     }
 
-    private fun Cursor.readEntries(): List<LedgerEntry> = buildList {
-        while (moveToNext()) add(toLedgerEntry(this@readEntries))
+    private fun replaceTags(db: SQLiteDatabase, entry: LedgerEntry) {
+        db.delete("entry_tags", "entry_id = ?", arrayOf(entry.id))
+        entry.categoryTags.forEachIndexed { index, name ->
+            db.execSQL("INSERT OR IGNORE INTO category_tags(name) VALUES (?)", arrayOf(name))
+            db.execSQL("INSERT INTO entry_tags(entry_id,tag_name,position) VALUES (?,?,?)",
+                arrayOf(entry.id, name, index))
+        }
+    }
+
+    private fun Cursor.readEntries(): List<LedgerEntry> {
+        val entries = buildList { while (moveToNext()) add(toLedgerEntry(this@readEntries)) }
+        if (entries.isEmpty()) return entries
+        // One bounded query for this cursor's entries avoids an extra query for each row.
+        val tags = mutableMapOf<String, MutableList<String>>()
+        helper.readableDatabase.rawQuery(
+            "SELECT t.entry_id,t.tag_name FROM entry_tags t JOIN ledger_entries e ON e.id=t.entry_id " +
+                "WHERE e.occurred_at >= ? AND e.occurred_at <= ? ORDER BY t.entry_id,t.position",
+            arrayOf(entries.minOf { it.occurredAtEpochMillis }.toString(), entries.maxOf { it.occurredAtEpochMillis }.toString()),
+        ).use { cursor ->
+            while (cursor.moveToNext()) tags.getOrPut(cursor.getString(0)) { mutableListOf() }.add(cursor.getString(1))
+        }
+        return entries.map { entry ->
+            val names = tags[entry.id].orEmpty()
+            entry.copy(additionalCategories = names.filterNot { it == entry.category })
+        }
     }
 
     private fun Cursor.readCandidates(): List<PendingLedgerCandidate> = buildList {
@@ -443,17 +480,39 @@ private class LedgerDatabaseHelper(context: Context, name: String) :
         val now = System.currentTimeMillis()
         db.execSQL("INSERT INTO accounts(name, created_at) VALUES (?, ?)", arrayOf<Any>("现金", now))
         db.execSQL("INSERT INTO accounts(name, created_at) VALUES (?, ?)", arrayOf<Any>("银行卡", now))
+        addTagsAndPlatforms(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion == 0 && newVersion >= 1) {
-            onCreate(db)
+        if (oldVersion == 1 && newVersion == 2) {
+            addTagsAndPlatforms(db)
             return
         }
         throw SQLiteException("No migration path from database version $oldVersion to $newVersion.")
     }
 
+    private fun addTagsAndPlatforms(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE category_tags (name TEXT PRIMARY KEY NOT NULL)")
+        db.execSQL("""
+            CREATE TABLE entry_tags (
+                entry_id TEXT NOT NULL REFERENCES ledger_entries(id) ON DELETE CASCADE,
+                tag_name TEXT NOT NULL REFERENCES category_tags(name),
+                position INTEGER NOT NULL CHECK(position >= 0),
+                PRIMARY KEY(entry_id, tag_name), UNIQUE(entry_id, position)
+            )
+        """.trimIndent())
+        CategoryTags.catalog.forEach { name ->
+            db.execSQL("INSERT OR IGNORE INTO category_tags(name) VALUES (?)", arrayOf(name))
+        }
+        db.execSQL("INSERT OR IGNORE INTO category_tags(name) SELECT DISTINCT category FROM ledger_entries")
+        db.execSQL("INSERT OR IGNORE INTO category_tags(name) SELECT DISTINCT category FROM notification_candidates")
+        db.execSQL("INSERT INTO entry_tags(entry_id,tag_name,position) SELECT id,category,0 FROM ledger_entries")
+        listOf("微信", "支付宝", "淘宝", "京东", "现金", "银行卡").forEach { name ->
+            db.execSQL("INSERT OR IGNORE INTO accounts(name,created_at) VALUES (?,?)", arrayOf(name, System.currentTimeMillis()))
+        }
+    }
+
     private companion object {
-        const val DATABASE_VERSION = 1
+        const val DATABASE_VERSION = 2
     }
 }

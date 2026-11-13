@@ -62,4 +62,22 @@ class CategoryTagFormTest {
         compose.onNodeWithTag("category_selected_保留标签").performScrollTo().performClick()
         compose.onNodeWithTag("entry_save").performScrollTo().assertIsNotEnabled()
     }
+
+    @Test fun pendingConfirmationAlsoAcceptsMultipleTagsAndPlatform() {
+        var tags: List<String>? = null
+        var platform: Long? = null
+        val candidate = com.eric.personalledger.data.PendingLedgerCandidate("a".repeat(64), "com.tencent.mm",
+            "微信支付", 1250, "其他", System.currentTimeMillis(),
+            com.eric.personalledger.data.CandidateStatus.PENDING, null)
+        compose.setContent { PersonalLedgerTheme {
+            PendingReviewScreen(listOf(candidate), accounts, null, false, null, {},
+                { _, _, selected, account, _, _ -> tags = selected; platform = account }, {})
+        } }
+        compose.onNodeWithText("核对并记账").performScrollTo().performClick()
+        compose.onNodeWithTag("category_quick_餐饮").performScrollTo().performClick()
+        compose.onNodeWithTag("platform_picker").performScrollTo().performClick()
+        compose.onNodeWithText("微信", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("确认记账").performClick()
+        compose.runOnIdle { assertEquals(listOf("其他", "餐饮"), tags); assertEquals(3L, platform) }
+    }
 }

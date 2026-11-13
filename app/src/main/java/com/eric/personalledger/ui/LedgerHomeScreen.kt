@@ -77,6 +77,8 @@ sealed interface LedgerHomeState {
         val accounts: List<LedgerAccount>,
         val expenseCategories: List<MonthlyCategoryTotal>,
         val incomeCategories: List<MonthlyCategoryTotal>,
+        val categoryTags: List<String> = emptyList(),
+        val commonTags: Map<EntryType, List<String>> = emptyMap(),
     ) : LedgerHomeState
 }
 
@@ -459,7 +461,8 @@ private fun EntryRow(entry: LedgerEntry, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(entry.category, color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(entry.categoryTags.joinToString(" · "), color = Ink, fontSize = 13.sp,
+                fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(3.dp))
             Text(
                 text = "${date.monthValue}.${date.dayOfMonth.toString().padStart(2, '0')}${entry.memo.takeIf(String::isNotBlank)?.let { " · $it" }.orEmpty()}",

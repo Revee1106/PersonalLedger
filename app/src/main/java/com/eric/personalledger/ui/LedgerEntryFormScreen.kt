@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eric.personalledger.domain.EntryType
+import com.eric.personalledger.domain.CategoryTags
 import com.eric.personalledger.domain.LedgerAccount
 import com.eric.personalledger.domain.LedgerEntry
 import com.eric.personalledger.domain.MoneyInput
@@ -73,6 +74,8 @@ fun LedgerEntryFormScreen(
     accountsLoading: Boolean = false,
     onRetryAccounts: (() -> Unit)? = null,
     autoFocusAmount: Boolean = false,
+    categoryOptions: List<String> = CategoryTags.catalog,
+    commonTags: Map<EntryType, List<String>> = emptyMap(),
 ) {
     BackHandler(enabled = !isSaving, onBack = onBack)
     val context = LocalContext.current
@@ -104,8 +107,8 @@ fun LedgerEntryFormScreen(
     var amountText by rememberSaveable(initialEntry?.id) {
         mutableStateOf(initialEntry?.amountCents?.let(MoneyInput::formatCents).orEmpty())
     }
-    var category by rememberSaveable(initialEntry?.id) {
-        mutableStateOf(initialEntry?.category ?: "餐饮")
+    var categories by rememberSaveable(initialEntry?.id) {
+        mutableStateOf(ArrayList(initialEntry?.categoryTags ?: listOf("餐饮")))
     }
     var memo by rememberSaveable(initialEntry?.id) { mutableStateOf(initialEntry?.memo.orEmpty()) }
     var accountId by rememberSaveable(initialEntry?.id) {
@@ -130,12 +133,11 @@ fun LedgerEntryFormScreen(
     }
 
     val parsedCents = MoneyInput.parseCents(amountText)
-    val trimmedCategory = category.trim()
+    val safeTags = runCatching { CategoryTags.normalize(categories) }.getOrNull()
     val isTransferValid = type != EntryType.TRANSFER ||
         (targetAccountId != 0L && targetAccountId != accountId)
     val canSave = parsedCents != null &&
-        trimmedCategory.isNotEmpty() &&
-        trimmedCategory.length <= 40 &&
+        safeTags != null &&
         accountId != 0L &&
         accounts.any { it.id == accountId } &&
         isTransferValid
@@ -175,9 +177,10 @@ fun LedgerEntryFormScreen(
                     FilterChip(
                         selected = type == option,
                         onClick = {
+                            if (type != option && categories == listOf(CategoryTags.defaults(type).first())) {
+                                categories = arrayListOf(CategoryTags.defaults(option).first())
+                            }
                             type = option
-                            if (option == EntryType.TRANSFER) category = "转账"
-                            else if (category == "转账") category = if (option == EntryType.INCOME) "工资" else "餐饮"
                         },
                         label = { Text(option.displayName()) },
                     )
@@ -234,22 +237,16 @@ fun LedgerEntryFormScreen(
             }
 
             Spacer(Modifier.height(18.dp))
-            Text("分类", color = FormMuted, fontSize = 13.sp)
-            OutlinedTextField(
-                value = category,
-                onValueChange = { category = it.take(40) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                placeholder = { Text("例如：餐饮、交通、工资") },
-            )
+            CategoryTagField(selected = categories, options = categoryOptions,
+                common = commonTags[type] ?: CategoryTags.defaults(type),
+                onChange = { categories = ArrayList(it) })
 
             Spacer(Modifier.height(18.dp))
-            Text(if (type == EntryType.TRANSFER) "转出账户" else "账户", color = FormMuted, fontSize = 13.sp)
-            if (accountsLoading) Text("正在读取账户…", color = FormMuted, fontSize = 12.sp)
+            Text(if (type == EntryType.TRANSFER) "转出平台" else "消费平台", color = FormMuted, fontSize = 13.sp)
+            if (accountsLoading) Text("正在读取消费平台…", color = FormMuted, fontSize = 12.sp)
             if (onRetryAccounts != null) {
-                Text("账户读取失败，请重试后保存。", color = Color(0xFF9A4742), fontSize = 12.sp)
-                TextButton(onClick = onRetryAccounts) { Text("重试读取账户") }
+                Text("消费平台读取失败，请重试后保存。", color = Color(0xFF9A4742), fontSize = 12.sp)
+                TextButton(onClick = onRetryAccounts) { Text("重试读取消费平台") }
             }
             AccountPicker(
                 accounts = accounts,
@@ -264,14 +261,15 @@ fun LedgerEntryFormScreen(
 
             if (type == EntryType.TRANSFER) {
                 Spacer(Modifier.height(14.dp))
-                Text("转入账户", color = FormMuted, fontSize = 13.sp)
+                Text("转入平台", color = FormMuted, fontSize = 13.sp)
                 AccountPicker(
                     accounts = accounts.filterNot { it.id == accountId },
                     selectedId = targetAccountId,
                     onSelect = { targetAccountId = it },
+                    testTag = "target_platform_picker",
                 )
                 if (accounts.size < 2) {
-                    Text("请先添加另一个账户，才能记录转账。", color = FormMuted, fontSize = 12.sp)
+                    Text("需要两个不同的消费平台才能记录转账。", color = FormMuted, fontSize = 12.sp)
                 }
             }
 
@@ -299,7 +297,8 @@ fun LedgerEntryFormScreen(
                             id = initialEntry?.id ?: UUID.randomUUID().toString(),
                             type = type,
                             amountCents = amountCents,
-                            category = trimmedCategory,
+                            category = safeTags!!.first(),
+                            additionalCategories = safeTags.drop(1),
                             accountId = accountId,
                             transferTargetAccountId = if (type == EntryType.TRANSFER) targetAccountId else null,
                             occurredAtEpochMillis = selectedDate.atTime(originalLocalTime)
@@ -344,17 +343,19 @@ fun LedgerEntryFormScreen(
 }
 
 @Composable
-private fun AccountPicker(
+internal fun AccountPicker(
     accounts: List<LedgerAccount>,
     selectedId: Long,
     onSelect: (Long) -> Unit,
+    testTag: String = "platform_picker",
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedName = accounts.firstOrNull { it.id == selectedId }?.name ?: "选择账户"
+    val selectedName = accounts.firstOrNull { it.id == selectedId }?.name ?: "选择消费平台"
     Box {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
+                .testTag(testTag)
                 .padding(top = 7.dp),
             color = Color.White,
             shape = RoundedCornerShape(16.dp),

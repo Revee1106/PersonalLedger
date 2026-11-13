@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eric.personalledger.data.PendingLedgerCandidate
 import com.eric.personalledger.domain.LedgerAccount
+import com.eric.personalledger.domain.CategoryTags
+import com.eric.personalledger.domain.EntryType
 import com.eric.personalledger.domain.MoneyInput
 import com.eric.personalledger.domain.ReviewReason
 import java.time.Instant
@@ -60,8 +63,10 @@ fun PendingReviewScreen(
     loading: Boolean,
     errorMessage: String?,
     onBack: () -> Unit,
-    onConfirm: (PendingLedgerCandidate, Long, String, Long, Long, String) -> Unit,
+    onConfirm: (PendingLedgerCandidate, Long, List<String>, Long, Long, String) -> Unit,
     onIgnore: (PendingLedgerCandidate) -> Unit,
+    categoryOptions: List<String> = CategoryTags.catalog,
+    commonTags: List<String> = CategoryTags.defaults(EntryType.EXPENSE),
 ) {
     BackHandler(onBack = onBack)
     var candidateBeingConfirmed by remember { mutableStateOf<PendingLedgerCandidate?>(null) }
@@ -123,6 +128,8 @@ fun PendingReviewScreen(
         CandidateConfirmationDialog(
             candidate = candidate,
             accounts = accounts,
+            categoryOptions = categoryOptions,
+            commonTags = commonTags,
             isBusy = busyCandidateId != null,
             onDismiss = { if (busyCandidateId == null) candidateBeingConfirmed = null },
             onConfirm = { amountCents, category, accountId, occurredAtEpochMillis, memo ->
@@ -178,9 +185,11 @@ private fun PendingCandidateCard(
 private fun CandidateConfirmationDialog(
     candidate: PendingLedgerCandidate,
     accounts: List<LedgerAccount>,
+    categoryOptions: List<String>,
+    commonTags: List<String>,
     isBusy: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (Long, String, Long, Long, String) -> Unit,
+    onConfirm: (Long, List<String>, Long, Long, String) -> Unit,
 ) {
     val context = LocalContext.current
     val zone = remember { ZoneId.systemDefault() }
@@ -190,12 +199,12 @@ private fun CandidateConfirmationDialog(
     var amountText by remember(candidate.id) {
         mutableStateOf(candidate.amountCents?.let(MoneyInput::formatCents).orEmpty())
     }
-    var category by remember(candidate.id) { mutableStateOf(candidate.category) }
+    var categories by rememberSaveable(candidate.id) { mutableStateOf(arrayListOf(candidate.category)) }
     var memo by remember(candidate.id) { mutableStateOf("") }
     var accountId by remember(candidate.id, accounts) { mutableStateOf(accounts.firstOrNull()?.id ?: 0L) }
     var selectedDate by remember(candidate.id) { mutableStateOf(eventTime.toLocalDate()) }
     val amountCents = MoneyInput.parseCents(amountText)
-    val safeCategory = category.trim()
+    val safeCategories = runCatching { CategoryTags.normalize(categories) }.getOrNull()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -217,12 +226,7 @@ private fun CandidateConfirmationDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
                 Spacer(Modifier.height(9.dp))
-                OutlinedTextField(
-                    value = category,
-                    onValueChange = { category = it.take(40) },
-                    label = { Text("分类") },
-                    singleLine = true,
-                )
+                CategoryTagField(categories, categoryOptions, commonTags, { categories = ArrayList(it) })
                 Spacer(Modifier.height(9.dp))
                 Text("日期", color = Muted, fontSize = 12.sp)
                 Surface(
@@ -255,26 +259,20 @@ private fun CandidateConfirmationDialog(
                     singleLine = true,
                 )
                 Spacer(Modifier.height(9.dp))
-                Text("记入账户", color = Muted, fontSize = 12.sp)
-                accounts.forEach { account ->
-                    FilterChip(
-                        selected = accountId == account.id,
-                        onClick = { accountId = account.id },
-                        label = { Text(account.name) },
-                    )
-                }
+                Text("消费平台", color = Muted, fontSize = 12.sp)
+                AccountPicker(accounts, accountId, { accountId = it })
             }
         },
         confirmButton = {
             TextButton(
-                enabled = !isBusy && amountCents != null && safeCategory.isNotEmpty() && accountId != 0L,
+                enabled = !isBusy && amountCents != null && safeCategories != null && accounts.any { it.id == accountId },
                 onClick = {
                     amountCents?.let {
                         val occurredAt = selectedDate.atTime(eventTime.toLocalTime())
                             .atZone(zone)
                             .toInstant()
                             .toEpochMilli()
-                        onConfirm(it, safeCategory, accountId, occurredAt, memo.trim())
+                        onConfirm(it, safeCategories!!, accountId, occurredAt, memo.trim())
                     }
                 },
             ) { Text(if (isBusy) "正在保存…" else "确认记账", color = Ink) }

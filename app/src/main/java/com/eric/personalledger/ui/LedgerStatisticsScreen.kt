@@ -129,7 +129,10 @@ fun LedgerStatisticsScreen(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Spacer(Modifier.height(18.dp))
-                            Text("分类分布", color = StatisticsInk, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                            Text("标签统计", color = StatisticsInk, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(6.dp))
+                            Text("多标签记录会计入各标签，标签金额可能重叠；总收支不重复计算。",
+                                color = StatisticsMuted, fontSize = 12.sp)
                             Spacer(Modifier.height(15.dp))
                             if (categories.isEmpty()) {
                                 Text("本月还没有${if (selectedType == EntryType.EXPENSE) "支出" else "收入"}记录", color = StatisticsMuted, fontSize = 13.sp)

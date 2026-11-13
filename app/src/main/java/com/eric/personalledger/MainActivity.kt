@@ -25,6 +25,7 @@ import com.eric.personalledger.data.CandidateConfirmationResult
 import com.eric.personalledger.data.PendingLedgerCandidate
 import com.eric.personalledger.data.SqliteLedgerRepository
 import com.eric.personalledger.domain.EntryType
+import com.eric.personalledger.domain.CategoryTags
 import com.eric.personalledger.domain.LedgerEntry
 import com.eric.personalledger.domain.LedgerRules
 import com.eric.personalledger.domain.MonthlyCategoryTotal
@@ -69,6 +70,8 @@ class MainActivity : ComponentActivity() {
     private var settingsError by mutableStateOf<String?>(null)
     private var pendingCandidates by mutableStateOf<List<PendingLedgerCandidate>>(emptyList())
     private var pendingAccounts by mutableStateOf(emptyList<com.eric.personalledger.domain.LedgerAccount>())
+    private var pendingTags by mutableStateOf(CategoryTags.catalog)
+    private var pendingCommonTags by mutableStateOf(CategoryTags.defaults(EntryType.EXPENSE))
     private var pendingLoading by mutableStateOf(false)
     private var pendingError by mutableStateOf<String?>(null)
     private var pendingBusyCandidateId by mutableStateOf<String?>(null)
@@ -90,6 +93,8 @@ class MainActivity : ComponentActivity() {
                     key(entryFormSession) {
                         LedgerEntryFormScreen(
                             accounts = loaded?.accounts.orEmpty(),
+                            categoryOptions = loaded?.categoryTags ?: CategoryTags.catalog,
+                            commonTags = loaded?.commonTags.orEmpty(),
                             initialEntry = editingEntry,
                             errorMessage = formError,
                             accountsLoading = homeState == LedgerHomeState.Loading,
@@ -105,6 +110,8 @@ class MainActivity : ComponentActivity() {
                     PendingReviewScreen(
                         candidates = pendingCandidates,
                         accounts = pendingAccounts,
+                        categoryOptions = pendingTags,
+                        commonTags = pendingCommonTags,
                         busyCandidateId = pendingBusyCandidateId,
                         loading = pendingLoading,
                         errorMessage = pendingError,
@@ -264,6 +271,10 @@ class MainActivity : ComponentActivity() {
                             budgetCents = repository.monthlyBudget(month),
                             pendingCount = repository.pendingCandidates().size,
                             accounts = repository.accounts(),
+                            categoryTags = repository.categoryTags(),
+                            commonTags = repository.allEntries().let { all ->
+                                EntryType.entries.associateWith { CategoryTags.common(all, it) }
+                            },
                             expenseCategories = LedgerRules.categoryTotals(entries, com.eric.personalledger.domain.EntryType.EXPENSE),
                             incomeCategories = LedgerRules.categoryTotals(entries, com.eric.personalledger.domain.EntryType.INCOME),
                         )
@@ -359,11 +370,14 @@ class MainActivity : ComponentActivity() {
             try {
                 val result = withContext(Dispatchers.IO) {
                     SqliteLedgerRepository(this@MainActivity).use { repository ->
-                        repository.pendingCandidates() to repository.accounts()
+                        PendingData(repository.pendingCandidates(), repository.accounts(),
+                            repository.categoryTags(), repository.commonCategoryTags(EntryType.EXPENSE))
                     }
                 }
-                pendingCandidates = result.first
-                pendingAccounts = result.second
+                pendingCandidates = result.candidates
+                pendingAccounts = result.accounts
+                pendingTags = result.tags
+                pendingCommonTags = result.commonTags
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: SQLiteException) {
@@ -377,7 +391,7 @@ class MainActivity : ComponentActivity() {
     private fun confirmCandidate(
         candidate: PendingLedgerCandidate,
         amountCents: Long,
-        category: String,
+        categories: List<String>,
         accountId: Long,
         occurredAtEpochMillis: Long,
         memo: String,
@@ -389,7 +403,8 @@ class MainActivity : ComponentActivity() {
             id = UUID.randomUUID().toString(),
             type = EntryType.EXPENSE,
             amountCents = amountCents,
-            category = category,
+            category = categories.first(),
+            additionalCategories = categories.drop(1),
             accountId = accountId,
             occurredAtEpochMillis = occurredAtEpochMillis,
             memo = memo,
@@ -415,7 +430,7 @@ class MainActivity : ComponentActivity() {
             } catch (_: SQLiteException) {
                 pendingError = "确认失败，请稍后重试。"
             } catch (_: IllegalArgumentException) {
-                pendingError = "这笔记录暂时无法保存，请检查金额和账户。"
+                pendingError = "这笔记录暂时无法保存，请检查金额和消费平台。"
             } finally {
                 pendingBusyCandidateId = null
             }
@@ -507,6 +522,13 @@ class MainActivity : ComponentActivity() {
         const val ACTION_OPEN_PENDING_REVIEW = "com.eric.personalledger.OPEN_PENDING_REVIEW"
         const val EXTRA_OPEN_PENDING_REVIEW = "open_pending_review"
     }
+
+    private data class PendingData(
+        val candidates: List<PendingLedgerCandidate>,
+        val accounts: List<com.eric.personalledger.domain.LedgerAccount>,
+        val tags: List<String>,
+        val commonTags: List<String>,
+    )
 
     // Survives configuration changes, but must reset after process death so a fresh
     // desktop click is not swallowed by a flag restored from an old dashboard.
