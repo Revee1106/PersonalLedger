@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.view.View
 import android.widget.TextView
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -31,6 +32,57 @@ import org.junit.runner.RunWith
 class QuickEntryWidgetTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test fun settingsOffersBothWidgetSizes() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            compose.onNodeWithText("账").performClick()
+            compose.onNodeWithText("添加 2×1 小卡片").assertIsDisplayed().assertIsEnabled()
+            compose.onNodeWithText("添加 4×1 宽卡片").assertIsDisplayed().assertIsEnabled()
+        }
+    }
+
+    @Test fun compactWidgetIsRegisteredAndOpensEntry() {
+        val provider = ComponentName(context, CompactEntryWidgetProvider::class.java)
+        val info = AppWidgetManager.getInstance(context).installedProviders.firstOrNull { it.provider == provider }
+        assertNotNull(info)
+        assertEquals(AppWidgetProviderInfo.RESIZE_HORIZONTAL, info!!.resizeMode)
+        if (Build.VERSION.SDK_INT >= 31) {
+            assertEquals(2, info.targetCellWidth)
+            assertEquals(1, info.targetCellHeight)
+        }
+        ActivityScenario.launch<MainActivity>(QuickEntryWidgetProvider.entryIntent(context)).use { scenario ->
+            returnToLedger()
+            scenario.onActivity { activity ->
+                val view = QuickEntryWidgetProvider.createViews(context, compact = true).apply(activity, null)
+                assertTrue(view.findViewById<View>(R.id.quick_entry_card).performClick())
+            }
+            awaitAmountFocus()
+        }
+    }
+
+    @Test fun compactTotalsUseTwoRowsAndOnlyAPlusAtTheRight() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = QuickEntryWidgetProvider.createViews(context, WidgetExpenseTotals(1_030, 1_234_567), compact = true)
+                .apply(context, null)
+            val density = context.resources.displayMetrics.density
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec((140 * density).toInt(), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec((48 * density).toInt(), View.MeasureSpec.EXACTLY),
+            )
+            view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+            val today = view.findViewById<TextView>(R.id.widget_today_amount)
+            val month = view.findViewById<TextView>(R.id.widget_month_amount)
+            assertEquals("¥10.30", today.text.toString())
+            assertEquals("¥12,345.67", month.text.toString())
+            assertTrue((today.parent as View).top < (month.parent as View).top)
+            assertEquals(0, today.layout.getEllipsisCount(0))
+            assertEquals(0, month.layout.getEllipsisCount(0))
+            val plus = view.findViewById<View>(R.id.widget_add_button)
+            assertTrue(plus.left >= (today.parent as View).right)
+            assertTrue(plus.right <= view.width - view.paddingRight)
+            assertTrue((month.parent as View).bottom <= view.height - view.paddingBottom)
+        }
+    }
 
     @Test fun coldWidgetLaunchFocusesAmountAndLoadsAccounts() {
         ActivityScenario.launch<MainActivity>(QuickEntryWidgetProvider.entryIntent(context)).use {
