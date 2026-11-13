@@ -39,13 +39,55 @@ class CategoryTagsRepositoryTest {
             assertEquals(listOf("餐饮", "聚餐"), repo.entriesForMonth(YearMonth.of(2026, 11), ZoneId.of("UTC")).single().categoryTags)
             assertTrue(repo.updateEntry(entry.copy(category = "购物", additionalCategories = listOf("礼物"))))
             assertEquals(listOf("购物", "礼物"), repo.allEntries().single().categoryTags)
-            assertEquals(listOf("礼物", "购物", "餐饮"), repo.commonCategoryTags(EntryType.EXPENSE))
+            assertEquals(listOf("餐饮", "交通", "购物"), repo.commonCategoryTags(EntryType.EXPENSE))
             assertTrue(repo.deleteEntry(entry.id))
             assertTrue(repo.allEntries().isEmpty())
         }
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
             db.rawQuery("SELECT count(*) FROM entry_tags", null).use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
         }
+    }
+
+    @Test fun onlyThreeDefaultsAndExplicitCommonPreferencesSurviveReopen() = withDatabase { name ->
+        SqliteLedgerRepository(context, name).use { repo ->
+            assertEquals(setOf("餐饮", "交通", "购物"), repo.categoryTags().toSet())
+            EntryType.entries.forEach { assertEquals(listOf("餐饮", "交通", "购物"), repo.commonCategoryTags(it)) }
+            repo.setCommonCategoryTags(EntryType.EXPENSE, listOf("聚餐", "交通"))
+            repo.setCommonCategoryTags(EntryType.INCOME, emptyList())
+        }
+        SqliteLedgerRepository(context, name).use { repo ->
+            assertEquals(listOf("聚餐", "交通"), repo.commonCategoryTags(EntryType.EXPENSE))
+            assertEquals(emptyList<String>(), repo.commonCategoryTags(EntryType.INCOME))
+            assertEquals(listOf("餐饮", "交通", "购物"), repo.commonCategoryTags(EntryType.TRANSFER))
+            assertTrue(repo.categoryTags().contains("聚餐"))
+            try { repo.setCommonCategoryTags(EntryType.EXPENSE, listOf("一", "二", "三", "四")); fail("Limit must apply") }
+            catch (_: IllegalArgumentException) { }
+            assertEquals(listOf("聚餐", "交通"), repo.commonCategoryTags(EntryType.EXPENSE))
+            assertFalse(repo.categoryTags().contains("四"))
+        }
+    }
+
+    @Test fun versionTwoUpgradeRemovesUnusedSeedsButKeepsUsedAndCustomTags() = withDatabase { name ->
+        context.getDatabasePath(name).parentFile!!.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->
+            val sql = InstrumentationRegistry.getInstrumentation().context.assets.open("ledger-v1.sql").bufferedReader().use { it.readText() }
+            sql.split(';').map(String::trim).filter(String::isNotEmpty).forEach(db::execSQL)
+            db.execSQL("CREATE TABLE category_tags(name TEXT PRIMARY KEY NOT NULL)")
+            db.execSQL("CREATE TABLE entry_tags(entry_id TEXT NOT NULL REFERENCES ledger_entries(id) ON DELETE CASCADE, tag_name TEXT NOT NULL REFERENCES category_tags(name), position INTEGER NOT NULL, PRIMARY KEY(entry_id,tag_name), UNIQUE(entry_id,position))")
+            listOf("餐饮", "交通", "购物", "工资", "奖金", "其他", "我的自定义标签").forEach {
+                db.execSQL("INSERT INTO category_tags VALUES(?)", arrayOf(it))
+            }
+            db.execSQL("INSERT INTO ledger_entries(id,type,amount_cents,category,account_id,occurred_at,memo) VALUES('income','INCOME',8800,'工资',1,1767000000000,'旧账')")
+            db.execSQL("INSERT INTO entry_tags VALUES('income','工资',0)")
+            db.version = 2
+        }
+        SqliteLedgerRepository(context, name).use { repo ->
+            assertEquals(setOf("餐饮", "交通", "购物", "工资", "我的自定义标签"), repo.categoryTags().toSet())
+            assertEquals(listOf("工资"), repo.allEntries().single().categoryTags)
+            assertEquals(8800L, repo.allEntries().single().amountCents)
+            repo.setCommonCategoryTags(EntryType.INCOME, listOf("工资"))
+        }
+        SqliteLedgerRepository(context, name).use { repo -> assertEquals(listOf("工资"), repo.commonCategoryTags(EntryType.INCOME)) }
     }
 
     @Test fun failedWritesDoNotLeaveTagsOrEntriesAndConfirmationIsAtomic() = withDatabase { name ->

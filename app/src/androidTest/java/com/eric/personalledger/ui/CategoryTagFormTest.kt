@@ -21,7 +21,7 @@ class CategoryTagFormTest {
             LedgerEntryFormScreen(accounts, null, null, false, {}, { saved = it }, {})
         } }
         compose.onNodeWithTag("entry_amount").performTextInput("12.50")
-        compose.onNodeWithTag("category_quick_交通").performScrollTo().performClick()
+        compose.onNodeWithTag("category_tag_交通").performScrollTo().performClick()
         compose.onNodeWithTag("platform_picker").performScrollTo().performClick()
         compose.onNodeWithText("支付宝").performClick()
         compose.onNodeWithTag("entry_save").performScrollTo().performClick()
@@ -46,7 +46,7 @@ class CategoryTagFormTest {
         compose.onNodeWithTag("category_create").performClick()
         compose.onNodeWithTag("category_done").performClick()
         restoration.emulateSavedInstanceStateRestore()
-        compose.onNodeWithTag("category_selected_朋友聚餐").assertExists()
+        compose.onNodeWithTag("category_tag_朋友聚餐").assertExists()
         compose.onNodeWithTag("category_options_button").performScrollTo().performClick()
         compose.onNodeWithTag("category_option_餐饮").performClick()
         compose.onNodeWithText("取消").performClick()
@@ -64,8 +64,8 @@ class CategoryTagFormTest {
                 100, "旧标签", 2, System.currentTimeMillis(), additionalCategories = listOf("保留标签")),
                 null, false, {}, {}, {})
         } }
-        compose.onNodeWithTag("category_selected_旧标签").performScrollTo().performClick()
-        compose.onNodeWithTag("category_selected_保留标签").performScrollTo().performClick()
+        compose.onNodeWithTag("category_tag_旧标签").performScrollTo().performClick()
+        compose.onNodeWithTag("category_tag_保留标签").performScrollTo().performClick()
         compose.onNodeWithTag("entry_save").performScrollTo().assertIsNotEnabled()
     }
 
@@ -80,7 +80,7 @@ class CategoryTagFormTest {
                 { _, _, selected, account, _, _ -> tags = selected; platform = account }, {})
         } }
         compose.onNodeWithText("核对并记账").performScrollTo().performClick()
-        compose.onNodeWithTag("category_quick_餐饮").performScrollTo().performClick()
+        compose.onNodeWithTag("category_tag_餐饮").performScrollTo().performClick()
         compose.onNodeWithTag("platform_picker").performScrollTo().performClick()
         compose.onNodeWithText("微信", useUnmergedTree = true).performClick()
         compose.onNodeWithText("确认记账").performClick()

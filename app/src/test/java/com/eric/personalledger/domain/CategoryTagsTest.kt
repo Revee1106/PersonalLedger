@@ -31,12 +31,31 @@ class CategoryTagsTest {
             WidgetExpenseTotals.calculate(listOf(entry), now, ZoneId.of("Asia/Taipei")))
     }
 
-    @Test fun commonTagsUseFrequencyThenRecencyAndFillThreeDefaults() {
-        val old = LedgerEntry("old", EntryType.EXPENSE, 100, "聚餐", 1, 100, additionalCategories = listOf("餐饮"))
-        val recent = old.copy(id = "recent", category = "咖啡", additionalCategories = listOf("聚餐"), occurredAtEpochMillis = 200)
-        val income = old.copy(id = "income", type = EntryType.INCOME, category = "工资", additionalCategories = emptyList())
-        assertEquals(listOf("聚餐", "咖啡", "餐饮"), CategoryTags.common(listOf(old, recent, income), EntryType.EXPENSE))
-        assertEquals(listOf("工资", "奖金", "理财"), CategoryTags.common(emptyList(), EntryType.INCOME))
-        assertEquals(3, CategoryTags.common(emptyList(), EntryType.TRANSFER).size)
+    @Test fun freshCatalogAndEveryEntryTypeHaveOnlyThreeDefaultTags() {
+        val defaults = listOf("餐饮", "交通", "购物")
+        assertEquals(defaults, CategoryTags.catalog)
+        EntryType.entries.forEach { assertEquals(defaults, CategoryTags.defaults(it)) }
+    }
+
+    @Test fun mostRecentlySelectedNoncommonTagsLeadAndCommonPositionsStayStable() {
+        assertEquals(listOf("咖啡", "聚餐", "餐饮", "交通", "购物"),
+            CategoryTags.displayOrder(listOf("餐饮", "聚餐", "咖啡"), listOf("餐饮", "交通", "购物")))
+    }
+
+    @Test fun deselectedExtrasDisappearAndCommonTagsAreNeverDuplicated() {
+        assertEquals(listOf("聚餐", "餐饮", "交通", "购物"),
+            CategoryTags.displayOrder(listOf("餐饮", "聚餐", "餐饮"), listOf("餐饮", "交通", "购物")))
+        assertEquals(listOf("餐饮", "交通", "购物"),
+            CategoryTags.displayOrder(emptyList(), listOf("餐饮", "交通", "购物")))
+    }
+
+    @Test fun commonPreferencesCanBeEmptyAndNormalizeWithoutFrequencyReplacement() {
+        assertEquals(emptyList<String>(), CategoryTags.normalizeCommon(emptyList()))
+        assertEquals(listOf("聚餐", "餐饮"), CategoryTags.normalizeCommon(listOf(" 聚餐 ", "餐饮", "聚餐")))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun commonPreferencesRejectMoreThanThreeUniqueTags() {
+        CategoryTags.normalizeCommon(listOf("甲", "乙", "丙", "丁"))
     }
 }
