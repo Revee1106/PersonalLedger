@@ -72,7 +72,7 @@ fun LedgerSettingsScreen(
                     Text("桌面记账卡片", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "在手机桌面放一张「记一笔」卡片，点击直接输入金额，无需额外授权。",
+                        "整行卡片显示今日消费和本月消费，点击即可记一笔，无需额外授权。",
                         color = Muted,
                         fontSize = 12.sp,
                     )
@@ -81,7 +81,7 @@ fun LedgerSettingsScreen(
                         Text("添加到桌面")
                     }
                     Text(
-                        widgetMessage ?: "也可长按桌面空白处，从小组件或窗口小工具中选择本应用的「记一笔」。",
+                        widgetMessage ?: "也可从桌面的小组件中添加「记一笔」。旧卡片可长按后横向拉宽，或重新添加；消费金额会显示在桌面。",
                         color = Muted,
                         fontSize = 12.sp,
                     )

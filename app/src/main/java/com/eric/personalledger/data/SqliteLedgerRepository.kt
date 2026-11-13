@@ -11,6 +11,8 @@ import com.eric.personalledger.domain.LedgerAccount
 import com.eric.personalledger.domain.LedgerEntry
 import com.eric.personalledger.domain.LedgerRules
 import com.eric.personalledger.domain.ReviewReason
+import com.eric.personalledger.domain.WidgetExpenseTotals
+import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 
@@ -114,6 +116,9 @@ class SqliteLedgerRepository(
             "occurred_at DESC, id DESC",
         ).use { cursor -> cursor.readEntries() }
     }
+
+    fun widgetExpenseTotals(now: Instant, zoneId: ZoneId): WidgetExpenseTotals =
+        WidgetExpenseTotals.calculate(entriesForMonth(YearMonth.from(now.atZone(zoneId)), zoneId), now, zoneId)
 
     fun insertEntry(entry: LedgerEntry) {
         validateEntry(entry)

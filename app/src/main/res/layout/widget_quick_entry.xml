@@ -19,30 +19,81 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:text="@string/quick_entry_widget_title"
-            android:textColor="#272824"
-            android:textSize="21sp" />
+            android:text="@string/widget_today_expense"
+            android:textColor="#707268"
+            android:textSize="11sp" />
 
         <TextView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
+            android:id="@+id/widget_today_amount"
+            android:layout_height="28dp"
+            android:layout_marginTop="4dp"
+            android:autoSizeMaxTextSize="21sp"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
             android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center_vertical"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:text="@string/app_name"
-            android:textColor="#707268"
-            android:textSize="11sp" />
+            android:text="@string/widget_amount_unavailable"
+            android:textColor="#272824" />
     </LinearLayout>
 
-    <ImageView
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_marginStart="8dp"
-        android:importantForAccessibility="no"
-        android:src="@drawable/ic_widget_add" />
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="@string/widget_month_expense"
+            android:textColor="#707268"
+            android:textSize="11sp" />
+        <TextView
+            android:id="@+id/widget_month_amount"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:layout_marginTop="4dp"
+            android:autoSizeMaxTextSize="21sp"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="@string/widget_amount_unavailable"
+            android:textColor="#272824" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="48dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="12dp"
+        android:gravity="center"
+        android:importantForAccessibility="noHideDescendants"
+        android:orientation="vertical">
+        <ImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_widget_add" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="@string/quick_entry_widget_title"
+            android:textColor="#707268"
+            android:textSize="10sp" />
+    </LinearLayout>
 </LinearLayout>

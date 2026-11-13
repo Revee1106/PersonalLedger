@@ -241,6 +241,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refreshNotificationAccess()
+        QuickEntryWidgetProvider.requestUpdate(this)
         if (showPendingReview) {
             if (pendingBusyCandidateId == null && !pendingLoading) loadPendingCandidates()
         } else if (!showEntryForm && !showSettings && !isSavingEntry && !isSavingBudget) {
@@ -312,6 +313,7 @@ class MainActivity : ComponentActivity() {
                         else repository.updateEntry(entry)
                     }
                 }
+                QuickEntryWidgetProvider.requestUpdate(this@MainActivity)
                 showEntryForm = false
                 loadMonth()
             } catch (cancelled: CancellationException) {
@@ -336,6 +338,7 @@ class MainActivity : ComponentActivity() {
                         repository.deleteEntry(entry.id)
                     }
                 }
+                QuickEntryWidgetProvider.requestUpdate(this@MainActivity)
                 showEntryForm = false
                 loadMonth()
             } catch (cancelled: CancellationException) {
@@ -399,6 +402,7 @@ class MainActivity : ComponentActivity() {
                         repository.confirmCandidate(candidate.id, entry)
                     }
                 }
+                QuickEntryWidgetProvider.requestUpdate(this@MainActivity)
                 PendingReviewNotifier.cancel(this@MainActivity, candidate.id)
                 when (result) {
                     CandidateConfirmationResult.CONFIRMED,

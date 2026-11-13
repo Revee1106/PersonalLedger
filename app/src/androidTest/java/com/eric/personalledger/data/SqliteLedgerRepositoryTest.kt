@@ -7,6 +7,9 @@ import com.eric.personalledger.domain.LedgerEntry
 import com.eric.personalledger.domain.LedgerRules
 import com.eric.personalledger.domain.NotificationIdentity
 import com.eric.personalledger.domain.ReviewReason
+import com.eric.personalledger.domain.WidgetExpenseTotals
+import java.time.Instant
+import java.time.ZoneId
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -232,6 +235,33 @@ class SqliteLedgerRepositoryTest {
         assertFalse(repository.ignoreCandidate(candidateId))
         assertTrue(repository.allEntries().isEmpty())
         assertEquals(0, repository.pendingCandidates().size)
+    }
+
+    @Test fun widgetTotalsFollowSavedChangesAndExcludePendingPayments() {
+        val now = Instant.parse("2026-11-13T02:00:00Z")
+        val zone = ZoneId.of("Asia/Taipei")
+        val accounts = repository.accounts()
+        val expense = LedgerEntry(
+            id = "widget-today", type = EntryType.EXPENSE, amountCents = 1_250,
+            category = "其他", accountId = accounts.first().id, occurredAtEpochMillis = now.toEpochMilli(),
+        )
+        assertEquals(WidgetExpenseTotals(0, 0), repository.widgetExpenseTotals(now, zone))
+        repository.insertEntry(expense)
+        repository.insertEntry(expense.copy(id = "widget-yesterday", amountCents = 700,
+            occurredAtEpochMillis = Instant.parse("2026-11-12T02:00:00Z").toEpochMilli()))
+        repository.insertEntry(expense.copy(id = "widget-income", type = EntryType.INCOME, amountCents = 9_000))
+        repository.insertEntry(expense.copy(id = "widget-transfer", type = EntryType.TRANSFER,
+            transferTargetAccountId = accounts.last().id))
+        assertEquals(WidgetExpenseTotals(1_250, 1_950), repository.widgetExpenseTotals(now, zone))
+        repository.updateEntry(expense.copy(amountCents = 2_300))
+        assertEquals(WidgetExpenseTotals(2_300, 3_000), repository.widgetExpenseTotals(now, zone))
+        repository.deleteEntry(expense.id)
+        assertEquals(WidgetExpenseTotals(0, 700), repository.widgetExpenseTotals(now, zone))
+        val candidateId = NotificationIdentity.idFor("com.tencent.mm", "widget-test", now.toEpochMilli())
+        repository.upsertCandidate(NotificationCandidateInput(candidateId, "com.tencent.mm", 350, null, now.toEpochMilli()))
+        assertEquals(WidgetExpenseTotals(0, 700), repository.widgetExpenseTotals(now, zone))
+        repository.confirmCandidate(candidateId, expense.copy(id = "widget-confirmed", amountCents = 350, candidateId = candidateId))
+        assertEquals(WidgetExpenseTotals(350, 1_050), repository.widgetExpenseTotals(now, zone))
     }
 
     @Test

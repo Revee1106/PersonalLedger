@@ -3,5 +3,11 @@
     <string name="notification_listener_label">个人账本支付通知辅助</string>
     <string name="quick_entry_widget_title">记一笔</string>
     <string name="quick_entry_widget_label">记一笔 · 桌面卡片</string>
-    <string name="quick_entry_widget_description">打开账本，快速记一笔</string>
+    <string name="quick_entry_widget_description">查看今日与本月消费，点击快速记一笔</string>
+    <string name="widget_today_expense">今日消费</string>
+    <string name="widget_month_expense">本月消费</string>
+    <string name="widget_amount">¥%1$s</string>
+    <string name="widget_amount_unavailable">—</string>
+    <string name="widget_totals_description">今日消费 %1$s 元，本月消费 %2$s 元，点击记一笔</string>
+    <string name="widget_totals_unavailable">统计暂不可用，点击打开账本记一笔</string>
 </resources>

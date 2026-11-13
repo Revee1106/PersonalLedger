@@ -1,8 +1,11 @@
 package com.eric.personalledger.widgets
 
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
+import android.os.Build
 import android.content.ComponentName
 import android.view.View
+import android.widget.TextView
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
@@ -16,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.eric.personalledger.MainActivity
 import com.eric.personalledger.R
+import com.eric.personalledger.domain.WidgetExpenseTotals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -61,7 +65,12 @@ class QuickEntryWidgetTest {
         val provider = ComponentName(context, QuickEntryWidgetProvider::class.java)
         val info = AppWidgetManager.getInstance(context).installedProviders.firstOrNull { it.provider == provider }
         assertNotNull(info)
-        assertEquals(0, info!!.updatePeriodMillis)
+        assertTrue(info!!.updatePeriodMillis >= 30 * 60 * 1000)
+        assertEquals(AppWidgetProviderInfo.RESIZE_HORIZONTAL, info.resizeMode)
+        if (Build.VERSION.SDK_INT >= 31) {
+            assertEquals(4, info.targetCellWidth)
+            assertEquals(1, info.targetCellHeight)
+        }
         ActivityScenario.launch<MainActivity>(QuickEntryWidgetProvider.entryIntent(context)).use { scenario ->
             returnToLedger()
             scenario.onActivity { activity ->
@@ -70,6 +79,35 @@ class QuickEntryWidgetTest {
                 assertTrue(card.performClick())
             }
             awaitAmountFocus()
+        }
+    }
+
+    @Test fun expenseTotalsRenderAtTheMinimumCardSize() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = QuickEntryWidgetProvider.createViews(context, WidgetExpenseTotals(1_030, 1_234_567))
+                .apply(context, null)
+            val density = context.resources.displayMetrics.density
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec((250 * density).toInt(), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec((72 * density).toInt(), View.MeasureSpec.EXACTLY),
+            )
+            view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+            val today = view.findViewById<TextView>(R.id.widget_today_amount)
+            val month = view.findViewById<TextView>(R.id.widget_month_amount)
+            assertEquals("¥10.30", today.text.toString())
+            assertEquals("¥12,345.67", month.text.toString())
+            assertTrue(today.width > 0 && month.width > 0)
+            assertEquals(0, today.layout.getEllipsisCount(0))
+            assertEquals(0, month.layout.getEllipsisCount(0))
+        }
+    }
+
+    @Test fun unavailableTotalsShowDashesInsteadOfFalseZero() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = QuickEntryWidgetProvider.createViews(context).apply(context, null)
+            assertEquals("—", view.findViewById<TextView>(R.id.widget_today_amount).text.toString())
+            assertEquals("—", view.findViewById<TextView>(R.id.widget_month_amount).text.toString())
+            assertTrue(view.contentDescription.toString().contains("暂不可用"))
         }
     }
 
