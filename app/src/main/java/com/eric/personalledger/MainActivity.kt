@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
                             accounts = loaded?.accounts.orEmpty(),
                             categoryOptions = loaded?.categoryTags ?: CategoryTags.catalog,
                             commonTags = loaded?.commonTags.orEmpty(),
+                            onSaveCommonTags = ::saveCommonTags,
                             initialEntry = editingEntry,
                             errorMessage = formError,
                             accountsLoading = homeState == LedgerHomeState.Loading,
@@ -112,6 +113,7 @@ class MainActivity : ComponentActivity() {
                         accounts = pendingAccounts,
                         categoryOptions = pendingTags,
                         commonTags = pendingCommonTags,
+                        onSaveCommonTags = { saveCommonTags(EntryType.EXPENSE, it) },
                         busyCandidateId = pendingBusyCandidateId,
                         loading = pendingLoading,
                         errorMessage = pendingError,
@@ -272,9 +274,7 @@ class MainActivity : ComponentActivity() {
                             pendingCount = repository.pendingCandidates().size,
                             accounts = repository.accounts(),
                             categoryTags = repository.categoryTags(),
-                            commonTags = repository.allEntries().let { all ->
-                                EntryType.entries.associateWith { CategoryTags.common(all, it) }
-                            },
+                            commonTags = EntryType.entries.associateWith(repository::commonCategoryTags),
                             expenseCategories = LedgerRules.categoryTotals(entries, com.eric.personalledger.domain.EntryType.EXPENSE),
                             incomeCategories = LedgerRules.categoryTotals(entries, com.eric.personalledger.domain.EntryType.INCOME),
                         )
@@ -288,6 +288,19 @@ class MainActivity : ComponentActivity() {
                 LedgerHomeState.Failed
             }
         }
+    }
+
+    private suspend fun saveCommonTags(type: EntryType, tags: List<String>) {
+        val updated = withContext(Dispatchers.IO) {
+            SqliteLedgerRepository(this@MainActivity).use { repository ->
+                repository.setCommonCategoryTags(type, tags)
+                repository.categoryTags() to EntryType.entries.associateWith(repository::commonCategoryTags)
+            }
+        }
+        val loaded = homeState as? LedgerHomeState.Loaded
+        if (loaded != null) homeState = loaded.copy(categoryTags = updated.first, commonTags = updated.second)
+        pendingTags = updated.first
+        pendingCommonTags = updated.second.getValue(EntryType.EXPENSE)
     }
 
     private fun saveBudget(amountCents: Long?) {

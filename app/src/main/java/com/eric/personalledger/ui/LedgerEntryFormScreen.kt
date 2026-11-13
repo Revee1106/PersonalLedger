@@ -76,6 +76,7 @@ fun LedgerEntryFormScreen(
     autoFocusAmount: Boolean = false,
     categoryOptions: List<String> = CategoryTags.catalog,
     commonTags: Map<EntryType, List<String>> = emptyMap(),
+    onSaveCommonTags: suspend (EntryType, List<String>) -> Unit = { _, _ -> },
 ) {
     BackHandler(enabled = !isSaving, onBack = onBack)
     val context = LocalContext.current
@@ -237,9 +238,12 @@ fun LedgerEntryFormScreen(
             }
 
             Spacer(Modifier.height(18.dp))
-            CategoryTagField(selected = categories, options = categoryOptions,
-                common = commonTags[type] ?: CategoryTags.defaults(type),
-                onChange = { categories = it.toList() })
+            androidx.compose.runtime.key(type) {
+                CategoryTagField(selected = categories, options = categoryOptions,
+                    common = commonTags[type] ?: CategoryTags.defaults(type),
+                    onChange = { categories = it.toList() },
+                    onSaveCommon = { onSaveCommonTags(type, it) })
+            }
 
             Spacer(Modifier.height(18.dp))
             Text(if (type == EntryType.TRANSFER) "转出平台" else "消费平台", color = FormMuted, fontSize = 13.sp)

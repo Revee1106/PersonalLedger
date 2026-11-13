@@ -16,6 +16,7 @@ import com.eric.personalledger.domain.WidgetExpenseTotals
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
+import org.json.JSONArray
 
 enum class CandidateStatus {
     PENDING,
@@ -59,7 +60,28 @@ class SqliteLedgerRepository(
         "SELECT name FROM category_tags ORDER BY name ASC", null,
     ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
 
-    fun commonCategoryTags(type: EntryType): List<String> = CategoryTags.common(allEntries(), type)
+    fun commonCategoryTags(type: EntryType): List<String> = helper.readableDatabase.rawQuery(
+        "SELECT tag_names FROM category_preferences WHERE entry_type = ?", arrayOf(type.name),
+    ).use { cursor ->
+        if (!cursor.moveToFirst()) CategoryTags.defaults(type)
+        else JSONArray(cursor.getString(0)).let { names ->
+            CategoryTags.normalizeCommon(List(names.length()) { names.getString(it) })
+        }
+    }
+
+    fun setCommonCategoryTags(type: EntryType, tags: List<String>) {
+        val names = CategoryTags.normalizeCommon(tags)
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            names.forEach { db.execSQL("INSERT OR IGNORE INTO category_tags(name) VALUES (?)", arrayOf(it)) }
+            db.insertWithOnConflict("category_preferences", null, ContentValues().apply {
+                put("entry_type", type.name)
+                put("tag_names", JSONArray(names).toString())
+            }, SQLiteDatabase.CONFLICT_REPLACE).also { check(it != -1L) }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+    }
 
     fun accounts(): List<LedgerAccount> = helper.readableDatabase.rawQuery(
         "SELECT id, name FROM accounts ORDER BY id ASC",
@@ -403,7 +425,7 @@ class SqliteLedgerRepository(
         private const val MAX_ACCOUNT_NAME_LENGTH = 40
         private const val MAX_CATEGORY_LENGTH = 40
         private const val MAX_MEMO_LENGTH = 240
-        private const val DEFAULT_CATEGORY = "其他"
+        private const val DEFAULT_CATEGORY = "餐饮"
         private val CANDIDATE_ID_PATTERN = Regex("[a-f0-9]{64}")
         private val TRUSTED_PAYMENT_PACKAGES = setOf("com.tencent.mm", "com.eg.android.AlipayGphone")
         private val ENTRY_COLUMNS = arrayOf(
@@ -481,14 +503,30 @@ private class LedgerDatabaseHelper(context: Context, name: String) :
         db.execSQL("INSERT INTO accounts(name, created_at) VALUES (?, ?)", arrayOf<Any>("现金", now))
         db.execSQL("INSERT INTO accounts(name, created_at) VALUES (?, ?)", arrayOf<Any>("银行卡", now))
         addTagsAndPlatforms(db)
+        addCategoryPreferences(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion == 1 && newVersion == 2) {
-            addTagsAndPlatforms(db)
+        if (oldVersion in 1..2 && newVersion == 3) {
+            if (oldVersion == 1) addTagsAndPlatforms(db)
+            addCategoryPreferences(db)
             return
         }
         throw SQLiteException("No migration path from database version $oldVersion to $newVersion.")
+    }
+
+    private fun addCategoryPreferences(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE category_preferences (
+                entry_type TEXT PRIMARY KEY NOT NULL CHECK(entry_type IN ('EXPENSE','INCOME','TRANSFER')),
+                tag_names TEXT NOT NULL
+            )
+        """.trimIndent())
+        // Only former built-ins with no saved ledger references are removed. Custom names are untouched.
+        listOf("工资", "奖金", "理财", "转账", "还款", "储蓄", "居家", "娱乐", "医疗", "教育", "其他").forEach { name ->
+            db.execSQL("DELETE FROM category_tags WHERE name = ? AND NOT EXISTS " +
+                "(SELECT 1 FROM entry_tags WHERE tag_name = category_tags.name)", arrayOf(name))
+        }
     }
 
     private fun addTagsAndPlatforms(db: SQLiteDatabase) {
@@ -513,6 +551,6 @@ private class LedgerDatabaseHelper(context: Context, name: String) :
     }
 
     private companion object {
-        const val DATABASE_VERSION = 2
+        const val DATABASE_VERSION = 3
     }
 }

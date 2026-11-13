@@ -67,6 +67,7 @@ fun PendingReviewScreen(
     onIgnore: (PendingLedgerCandidate) -> Unit,
     categoryOptions: List<String> = CategoryTags.catalog,
     commonTags: List<String> = CategoryTags.defaults(EntryType.EXPENSE),
+    onSaveCommonTags: suspend (List<String>) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
     var candidateBeingConfirmed by remember { mutableStateOf<PendingLedgerCandidate?>(null) }
@@ -130,6 +131,7 @@ fun PendingReviewScreen(
             accounts = accounts,
             categoryOptions = categoryOptions,
             commonTags = commonTags,
+            onSaveCommonTags = onSaveCommonTags,
             isBusy = busyCandidateId != null,
             onDismiss = { if (busyCandidateId == null) candidateBeingConfirmed = null },
             onConfirm = { amountCents, category, accountId, occurredAtEpochMillis, memo ->
@@ -187,6 +189,7 @@ private fun CandidateConfirmationDialog(
     accounts: List<LedgerAccount>,
     categoryOptions: List<String>,
     commonTags: List<String>,
+    onSaveCommonTags: suspend (List<String>) -> Unit,
     isBusy: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (Long, List<String>, Long, Long, String) -> Unit,
@@ -226,7 +229,7 @@ private fun CandidateConfirmationDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
                 Spacer(Modifier.height(9.dp))
-                CategoryTagField(categories, categoryOptions, commonTags, { categories = it.toList() })
+                CategoryTagField(categories, categoryOptions, commonTags, { categories = it.toList() }, onSaveCommonTags)
                 Spacer(Modifier.height(9.dp))
                 Text("日期", color = Muted, fontSize = 12.sp)
                 Surface(
