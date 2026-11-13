@@ -228,14 +228,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun addDesktopWidget() {
+    private fun addDesktopWidget(compact: Boolean) {
         val manager = AppWidgetManager.getInstance(this)
         widgetMessage = if (!manager.isRequestPinAppWidgetSupported) {
             "当前桌面不支持应用内添加。请长按桌面空白处，在小组件或窗口小工具中选择本应用的「记一笔」。"
         } else {
             try {
                 val accepted = manager.requestPinAppWidget(
-                    ComponentName(this, QuickEntryWidgetProvider::class.java), null, null,
+                    ComponentName(this, if (compact) com.eric.personalledger.widgets.CompactEntryWidgetProvider::class.java
+                        else QuickEntryWidgetProvider::class.java), null, null,
                 )
                 if (accepted) "请在系统弹窗中确认添加。若没有弹窗，也可从桌面的小组件列表添加。"
                 else "桌面未接受添加请求，请从桌面的小组件列表手动添加。"

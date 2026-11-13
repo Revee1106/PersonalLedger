@@ -37,7 +37,7 @@ private val Card = Color(0xFFF0F0EA)
 @Composable
 fun LedgerSettingsScreen(
     widgetMessage: String?,
-    onAddDesktopWidget: () -> Unit,
+    onAddDesktopWidget: (compact: Boolean) -> Unit,
     notificationAccessEnabled: Boolean,
     reminderPermissionGranted: Boolean,
     remindersEnabled: Boolean,
@@ -72,16 +72,19 @@ fun LedgerSettingsScreen(
                     Text("桌面记账卡片", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "整行卡片显示今日消费和本月消费，点击即可记一笔，无需额外授权。",
+                        "可选 2×1 小卡片或 4×1 宽卡片，显示日消费和月消费，点击即可记一笔。",
                         color = Muted,
                         fontSize = 12.sp,
                     )
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = onAddDesktopWidget, modifier = Modifier.fillMaxWidth()) {
-                        Text("添加到桌面")
+                    Button(onClick = { onAddDesktopWidget(true) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("添加 2×1 小卡片")
+                    }
+                    Button(onClick = { onAddDesktopWidget(false) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("添加 4×1 宽卡片")
                     }
                     Text(
-                        widgetMessage ?: "也可从桌面的小组件中添加「记一笔」。旧卡片可长按后横向拉宽，或重新添加；消费金额会显示在桌面。",
+                        widgetMessage ?: "也可长按桌面，从小组件中选择「记一笔」的 2×1 或 4×1 卡片；实际占格由桌面网格决定。",
                         color = Muted,
                         fontSize = 12.sp,
                     )

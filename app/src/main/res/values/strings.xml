@@ -2,7 +2,11 @@
     <string name="app_name">PersonalLedger</string>
     <string name="notification_listener_label">个人账本支付通知辅助</string>
     <string name="quick_entry_widget_title">记一笔</string>
-    <string name="quick_entry_widget_label">记一笔 · 桌面卡片</string>
+    <string name="quick_entry_widget_label">记一笔 · 4×1 宽卡片</string>
+    <string name="compact_entry_widget_label">记一笔 · 2×1 小卡片</string>
+    <string name="compact_entry_widget_description">两行显示日消费与月消费，点击加号快速记账</string>
+    <string name="widget_day_short">日消费</string>
+    <string name="widget_month_short">月消费</string>
     <string name="quick_entry_widget_description">查看今日与本月消费，点击快速记一笔</string>
     <string name="widget_today_expense">今日消费</string>
     <string name="widget_month_expense">本月消费</string>

@@ -20,7 +20,7 @@ import java.time.ZoneId
 import java.util.concurrent.Executors
 
 /** Local expense summary and launcher entry; database work stays off the receiver thread. */
-class QuickEntryWidgetProvider : AppWidgetProvider() {
+open class QuickEntryWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_REFRESH, Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_TIME_CHANGED,
@@ -61,12 +61,17 @@ class QuickEntryWidgetProvider : AppWidgetProvider() {
         private val updates = Executors.newSingleThreadExecutor()
 
         fun requestUpdate(context: Context) {
-            if (widgetIds(context).isEmpty()) return
+            if (widgetGroups(context).values.all { it.isEmpty() }) return
             context.sendBroadcast(Intent(context, QuickEntryWidgetProvider::class.java).setAction(ACTION_REFRESH))
         }
 
-        private fun widgetIds(context: Context): IntArray = AppWidgetManager.getInstance(context)
-            .getAppWidgetIds(ComponentName(context, QuickEntryWidgetProvider::class.java))
+        private fun widgetGroups(context: Context): Map<Boolean, IntArray> {
+            val manager = AppWidgetManager.getInstance(context)
+            return mapOf(
+                false to manager.getAppWidgetIds(ComponentName(context, QuickEntryWidgetProvider::class.java)),
+                true to manager.getAppWidgetIds(ComponentName(context, CompactEntryWidgetProvider::class.java)),
+            )
+        }
 
         private fun refreshPendingIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
             context, 7102, Intent(context, QuickEntryWidgetProvider::class.java).setAction(ACTION_REFRESH),
@@ -74,9 +79,9 @@ class QuickEntryWidgetProvider : AppWidgetProvider() {
         )
 
         private fun updateWidgets(context: Context) {
-            val ids = widgetIds(context)
+            val groups = widgetGroups(context)
             val alarms = context.getSystemService(AlarmManager::class.java)
-            if (ids.isEmpty()) {
+            if (groups.values.all { it.isEmpty() }) {
                 alarms.cancel(refreshPendingIntent(context))
                 return
             }
@@ -91,7 +96,10 @@ class QuickEntryWidgetProvider : AppWidgetProvider() {
             } catch (_: IllegalArgumentException) {
                 null
             }
-            AppWidgetManager.getInstance(context).updateAppWidget(ids, createViews(context, totals))
+            val manager = AppWidgetManager.getInstance(context)
+            groups.forEach { (compact, ids) ->
+                if (ids.isNotEmpty()) manager.updateAppWidget(ids, createViews(context, totals, compact))
+            }
             // Non-wakeup, inexact alarm: no exact-alarm permission or foreground service.
             alarms.set(AlarmManager.RTC, WidgetExpenseTotals.nextDayStart(now, zone).toEpochMilli(), refreshPendingIntent(context))
         }
@@ -104,7 +112,9 @@ class QuickEntryWidgetProvider : AppWidgetProvider() {
             context, 7101, entryIntent(context), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        fun createViews(context: Context, totals: WidgetExpenseTotals? = null) = RemoteViews(context.packageName, R.layout.widget_quick_entry).apply {
+        fun createViews(context: Context, totals: WidgetExpenseTotals? = null, compact: Boolean = false) = RemoteViews(
+            context.packageName, if (compact) R.layout.widget_quick_entry_compact else R.layout.widget_quick_entry,
+        ).apply {
             val today = totals?.let { MoneyInput.formatCents(it.todayCents) }
             val month = totals?.let { MoneyInput.formatCents(it.monthCents) }
             setTextViewText(R.id.widget_today_amount, today?.let { context.getString(R.string.widget_amount, it) }
