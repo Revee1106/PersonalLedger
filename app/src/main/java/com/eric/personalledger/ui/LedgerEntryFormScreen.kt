@@ -107,8 +107,8 @@ fun LedgerEntryFormScreen(
     var amountText by rememberSaveable(initialEntry?.id) {
         mutableStateOf(initialEntry?.amountCents?.let(MoneyInput::formatCents).orEmpty())
     }
-    var categories by rememberSaveable(initialEntry?.id) {
-        mutableStateOf(ArrayList(initialEntry?.categoryTags ?: listOf("餐饮")))
+    var categories by rememberSaveable(initialEntry?.id, stateSaver = CategoryTagListSaver) {
+        mutableStateOf(initialEntry?.categoryTags ?: listOf("餐饮"))
     }
     var memo by rememberSaveable(initialEntry?.id) { mutableStateOf(initialEntry?.memo.orEmpty()) }
     var accountId by rememberSaveable(initialEntry?.id) {
@@ -178,7 +178,7 @@ fun LedgerEntryFormScreen(
                         selected = type == option,
                         onClick = {
                             if (type != option && categories == listOf(CategoryTags.defaults(type).first())) {
-                                categories = arrayListOf(CategoryTags.defaults(option).first())
+                                categories = listOf(CategoryTags.defaults(option).first())
                             }
                             type = option
                         },
@@ -239,7 +239,7 @@ fun LedgerEntryFormScreen(
             Spacer(Modifier.height(18.dp))
             CategoryTagField(selected = categories, options = categoryOptions,
                 common = commonTags[type] ?: CategoryTags.defaults(type),
-                onChange = { categories = ArrayList(it) })
+                onChange = { categories = it.toList() })
 
             Spacer(Modifier.height(18.dp))
             Text(if (type == EntryType.TRANSFER) "转出平台" else "消费平台", color = FormMuted, fontSize = 13.sp)

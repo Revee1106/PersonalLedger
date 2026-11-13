@@ -372,7 +372,7 @@ class SqliteLedgerRepository(
         entry.categoryTags.forEachIndexed { index, name ->
             db.execSQL("INSERT OR IGNORE INTO category_tags(name) VALUES (?)", arrayOf(name))
             db.execSQL("INSERT INTO entry_tags(entry_id,tag_name,position) VALUES (?,?,?)",
-                arrayOf(entry.id, name, index))
+                arrayOf<Any>(entry.id, name, index))
         }
     }
 
@@ -508,7 +508,7 @@ private class LedgerDatabaseHelper(context: Context, name: String) :
         db.execSQL("INSERT OR IGNORE INTO category_tags(name) SELECT DISTINCT category FROM notification_candidates")
         db.execSQL("INSERT INTO entry_tags(entry_id,tag_name,position) SELECT id,category,0 FROM ledger_entries")
         listOf("微信", "支付宝", "淘宝", "京东", "现金", "银行卡").forEach { name ->
-            db.execSQL("INSERT OR IGNORE INTO accounts(name,created_at) VALUES (?,?)", arrayOf(name, System.currentTimeMillis()))
+            db.execSQL("INSERT OR IGNORE INTO accounts(name,created_at) VALUES (?,?)", arrayOf<Any>(name, System.currentTimeMillis()))
         }
     }
 

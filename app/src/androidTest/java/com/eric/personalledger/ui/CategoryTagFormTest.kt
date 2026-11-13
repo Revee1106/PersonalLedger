@@ -39,6 +39,8 @@ class CategoryTagFormTest {
             LedgerEntryFormScreen(accounts, null, null, false, {}, { saved = it }, {})
         } }
         compose.onNodeWithTag("entry_amount").performTextInput("20")
+        compose.onNodeWithTag("platform_picker").performScrollTo().performClick()
+        compose.onNodeWithText("京东").performClick()
         compose.onNodeWithTag("category_options_button").performScrollTo().performClick()
         compose.onNodeWithTag("category_search").performTextInput("朋友聚餐")
         compose.onNodeWithTag("category_create").performClick()
@@ -49,7 +51,11 @@ class CategoryTagFormTest {
         compose.onNodeWithTag("category_option_餐饮").performClick()
         compose.onNodeWithText("取消").performClick()
         compose.onNodeWithTag("entry_save").performScrollTo().performClick()
-        compose.runOnIdle { assertEquals(listOf("餐饮", "朋友聚餐"), saved?.categoryTags) }
+        compose.runOnIdle {
+            assertEquals(listOf("餐饮", "朋友聚餐"), saved?.categoryTags)
+            assertEquals(6L, saved?.accountId)
+            assertEquals(2000L, saved?.amountCents)
+        }
     }
 
     @Test fun removingLastTagDisablesSavingAndEditingKeepsAllTags() {

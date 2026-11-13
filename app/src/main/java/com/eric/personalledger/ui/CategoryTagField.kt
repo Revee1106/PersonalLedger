@@ -6,6 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -15,6 +16,7 @@ import com.eric.personalledger.domain.CategoryTags
 
 private val TagInk = Color(0xFF30332D)
 private val TagMuted = Color(0xFF85867F)
+internal val CategoryTagListSaver = listSaver<List<String>, String>(save = { it }, restore = { it.toList() })
 
 /** Selection is a draft: cancelling the picker never changes the form. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -55,8 +57,8 @@ fun CategoryTagField(
         }
     }
     if (pickerOpen) {
-        var draft by rememberSaveable { mutableStateOf(ArrayList(selected)) }
-        var created by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+        var draft by rememberSaveable(stateSaver = CategoryTagListSaver) { mutableStateOf(selected.toList()) }
+        var created by rememberSaveable(stateSaver = CategoryTagListSaver) { mutableStateOf(emptyList<String>()) }
         var search by rememberSaveable { mutableStateOf("") }
         val query = search.trim()
         val catalog = (selected + options + created).distinct()
@@ -72,8 +74,8 @@ fun CategoryTagField(
                     if (query.isNotEmpty() && !validName) Text("标签限 1–40 个字符，不能含换行", color = TagMuted, fontSize = 12.sp)
                     if (validName && query !in catalog) {
                         TextButton(onClick = {
-                            created = ArrayList(created + query)
-                            draft = ArrayList((draft + query).distinct())
+                            created = created + query
+                            draft = (draft + query).distinct()
                             search = ""
                         }, modifier = Modifier.testTag("category_create")) { Text("新建「$query」", color = TagInk) }
                     }
@@ -81,7 +83,7 @@ fun CategoryTagField(
                         .fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
                         catalog.filter { query.isEmpty() || it.contains(query, ignoreCase = true) }.forEach { tag ->
                             FilterChip(selected = tag in draft,
-                                onClick = { draft = ArrayList(if (tag in draft) draft - tag else draft + tag) },
+                                onClick = { draft = if (tag in draft) draft - tag else draft + tag },
                                 label = { Text(tag) },
                                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFE7E8E2)),
                                 modifier = Modifier.testTag("category_option_$tag"))

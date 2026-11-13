@@ -199,7 +199,7 @@ private fun CandidateConfirmationDialog(
     var amountText by remember(candidate.id) {
         mutableStateOf(candidate.amountCents?.let(MoneyInput::formatCents).orEmpty())
     }
-    var categories by rememberSaveable(candidate.id) { mutableStateOf(arrayListOf(candidate.category)) }
+    var categories by rememberSaveable(candidate.id, stateSaver = CategoryTagListSaver) { mutableStateOf(listOf(candidate.category)) }
     var memo by remember(candidate.id) { mutableStateOf("") }
     var accountId by remember(candidate.id, accounts) { mutableStateOf(accounts.firstOrNull()?.id ?: 0L) }
     var selectedDate by remember(candidate.id) { mutableStateOf(eventTime.toLocalDate()) }
@@ -226,7 +226,7 @@ private fun CandidateConfirmationDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
                 Spacer(Modifier.height(9.dp))
-                CategoryTagField(categories, categoryOptions, commonTags, { categories = ArrayList(it) })
+                CategoryTagField(categories, categoryOptions, commonTags, { categories = it.toList() })
                 Spacer(Modifier.height(9.dp))
                 Text("日期", color = Muted, fontSize = 12.sp)
                 Surface(
