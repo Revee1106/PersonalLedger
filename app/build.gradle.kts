@@ -20,12 +20,6 @@ android {
     }
 
     buildTypes {
-        create("probe") {
-            initWith(getByName("debug"))
-            applicationIdSuffix = ".probe"
-            versionNameSuffix = "-probe"
-            matchingFallbacks += listOf("debug")
-        }
         release {
             optimization {
                 enable = true

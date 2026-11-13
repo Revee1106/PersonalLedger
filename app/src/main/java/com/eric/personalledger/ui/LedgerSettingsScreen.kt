@@ -45,7 +45,6 @@ fun LedgerSettingsScreen(
     onOpenNotificationSettings: () -> Unit,
     onOpenAppNotificationSettings: () -> Unit,
     onReminderPermissionResult: () -> Unit,
-    onOpenPageProbe: () -> Unit,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -73,7 +72,7 @@ fun LedgerSettingsScreen(
                     Text("桌面记账卡片", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "在手机桌面放一张「记一笔」卡片，点击直接输入金额。无需通知或无障碍授权。",
+                        "在手机桌面放一张「记一笔」卡片，点击直接输入金额，无需额外授权。",
                         color = Muted,
                         fontSize = 12.sp,
                     )
@@ -86,21 +85,6 @@ fun LedgerSettingsScreen(
                         color = Muted,
                         fontSize = 12.sp,
                     )
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-            Surface(color = Card, shape = RoundedCornerShape(16.dp)) {
-                Column(Modifier.fillMaxWidth().padding(17.dp)) {
-                    Text("付款页面读取验证", color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "通知无法覆盖的付款场景，可手动验证页面能否读取。每次五分钟，仅展示本机读取结果，暂不自动记账。",
-                        color = Muted,
-                        fontSize = 12.sp,
-                    )
-                    TextButton(onClick = onOpenPageProbe, modifier = Modifier.fillMaxWidth()) {
-                        Text("进入验证")
-                    }
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -191,7 +175,7 @@ fun LedgerSettingsScreen(
             }
             Spacer(Modifier.height(14.dp))
             Text(
-                "手动记账无需开启通知访问或无障碍。页面读取验证需单独授权并手动启动；应用不读取短信，不使用悬浮窗。",
+                "手动记账无需开启通知访问。应用不读取其他应用的页面或短信，不使用悬浮窗。",
                 color = Muted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 3.dp),

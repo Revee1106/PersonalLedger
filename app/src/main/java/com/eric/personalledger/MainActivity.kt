@@ -11,8 +11,6 @@ import android.os.Build
 import android.os.Bundle
 import android.content.pm.PackageManager
 import android.provider.Settings
-import android.accessibilityservice.AccessibilityServiceInfo
-import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,9 +35,6 @@ import com.eric.personalledger.ui.LedgerSettingsScreen
 import com.eric.personalledger.ui.LedgerStatisticsScreen
 import com.eric.personalledger.ui.LedgerTab
 import com.eric.personalledger.ui.PendingReviewScreen
-import com.eric.personalledger.ui.PageProbeScreen
-import com.eric.personalledger.accessibility.PaymentPageProbeService
-import com.eric.personalledger.accessibility.PageProbeStore
 import com.eric.personalledger.ui.theme.PersonalLedgerTheme
 import com.eric.personalledger.notifications.PaymentNotificationListenerService
 import com.eric.personalledger.notifications.PendingReviewNotifier
@@ -63,8 +58,6 @@ class MainActivity : ComponentActivity() {
     private val launchState by lazy { ViewModelProvider(this)[LaunchState::class.java] }
     private var showPendingReview by mutableStateOf(false)
     private var showSettings by mutableStateOf(false)
-    private var showPageProbe by mutableStateOf(false)
-    private var pageProbeAccessEnabled by mutableStateOf(false)
     private var selectedTab by mutableStateOf(LedgerTab.LEDGER)
     private var editingEntry by mutableStateOf<LedgerEntry?>(null)
     private var formError by mutableStateOf<String?>(null)
@@ -92,14 +85,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PersonalLedgerTheme(darkTheme = false, dynamicColor = false) {
-                if (showPageProbe) {
-                    PageProbeScreen(
-                        accessEnabled = pageProbeAccessEnabled,
-                        errorMessage = settingsError,
-                        onOpenAccessibilitySettings = ::openAccessibilitySettings,
-                        onBack = { showPageProbe = false },
-                    )
-                } else if (showEntryForm) {
+                if (showEntryForm) {
                     val loaded = homeState as? LedgerHomeState.Loaded
                     key(entryFormSession) {
                         LedgerEntryFormScreen(
@@ -140,10 +126,6 @@ class MainActivity : ComponentActivity() {
                         onOpenNotificationSettings = ::openNotificationListenerSettings,
                         onOpenAppNotificationSettings = ::openAppNotificationSettings,
                         onReminderPermissionResult = ::refreshNotificationAccess,
-                        onOpenPageProbe = {
-                            settingsError = null
-                            showPageProbe = true
-                        },
                         onBack = { showSettings = false },
                     )
                 } else if (selectedTab == LedgerTab.LEDGER) {
@@ -226,7 +208,6 @@ class MainActivity : ComponentActivity() {
         formError = null
         focusEntryAmount = fromWidget
         showSettings = false
-        showPageProbe = false
         showPendingReview = false
         selectedTab = LedgerTab.LEDGER
         showEntryForm = true
@@ -259,7 +240,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        PageProbeStore.expireIfNeeded()
         refreshNotificationAccess()
         if (showPendingReview) {
             if (pendingBusyCandidateId == null && !pendingLoading) loadPendingCandidates()
@@ -463,14 +443,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refreshNotificationAccess() {
-        val accessibilityManager = getSystemService(AccessibilityManager::class.java)
-        val probeService = ComponentName(this, PaymentPageProbeService::class.java)
-        pageProbeAccessEnabled = accessibilityManager
-            .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-            .any { info ->
-                val service = info.resolveInfo.serviceInfo
-                ComponentName(service.packageName, service.name) == probeService
-            }
         val listener = ComponentName(this, PaymentNotificationListenerService::class.java)
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationAccessEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -495,15 +467,6 @@ class MainActivity : ComponentActivity() {
             notificationManager.areNotificationsEnabled() && channelEnabled
     }
 
-    private fun openAccessibilitySettings() {
-        settingsError = null
-        try {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        } catch (_: ActivityNotFoundException) {
-            settingsError = "此设备无法打开无障碍设置，请在系统设置中查找。"
-        }
-    }
-
     private fun openNotificationListenerSettings() {
         settingsError = null
         try {
@@ -526,7 +489,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openPendingReview() {
-        showPageProbe = false
         showEntryForm = false
         showSettings = false
         showPendingReview = true

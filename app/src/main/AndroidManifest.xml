@@ -45,18 +45,6 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
-        <service
-            android:name=".accessibility.PaymentPageProbeService"
-            android:exported="true"
-            android:label="@string/page_probe_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/payment_page_probe_service" />
-        </service>
     </application>
 
 </manifest>
