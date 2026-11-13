@@ -89,7 +89,7 @@ class QuickEntryWidgetTest {
             val density = context.resources.displayMetrics.density
             view.measure(
                 View.MeasureSpec.makeMeasureSpec((250 * density).toInt(), View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec((72 * density).toInt(), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec((48 * density).toInt(), View.MeasureSpec.EXACTLY),
             )
             view.layout(0, 0, view.measuredWidth, view.measuredHeight)
             val today = view.findViewById<TextView>(R.id.widget_today_amount)
@@ -99,6 +99,9 @@ class QuickEntryWidgetTest {
             assertTrue(today.width > 0 && month.width > 0)
             assertEquals(0, today.layout.getEllipsisCount(0))
             assertEquals(0, month.layout.getEllipsisCount(0))
+            val stats = today.parent as View
+            assertTrue(stats.top >= view.paddingTop)
+            assertTrue(stats.bottom <= view.height - view.paddingBottom)
         }
     }
 

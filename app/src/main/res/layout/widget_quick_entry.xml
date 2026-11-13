@@ -8,7 +8,7 @@
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingHorizontal="14dp"
-    android:paddingVertical="10dp">
+    android:paddingVertical="4dp">
 
     <LinearLayout
         android:layout_width="0dp"
@@ -28,8 +28,8 @@
         <TextView
             android:layout_width="match_parent"
             android:id="@+id/widget_today_amount"
-            android:layout_height="28dp"
-            android:layout_marginTop="4dp"
+            android:layout_height="24dp"
+            android:layout_marginTop="2dp"
             android:autoSizeMaxTextSize="21sp"
             android:autoSizeMinTextSize="10sp"
             android:autoSizeStepGranularity="1sp"
@@ -60,8 +60,8 @@
         <TextView
             android:id="@+id/widget_month_amount"
             android:layout_width="match_parent"
-            android:layout_height="28dp"
-            android:layout_marginTop="4dp"
+            android:layout_height="24dp"
+            android:layout_marginTop="2dp"
             android:autoSizeMaxTextSize="21sp"
             android:autoSizeMinTextSize="10sp"
             android:autoSizeStepGranularity="1sp"
@@ -83,13 +83,13 @@
         android:importantForAccessibility="noHideDescendants"
         android:orientation="vertical">
         <ImageView
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:src="@drawable/ic_widget_add" />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="2dp"
             android:includeFontPadding="false"
             android:maxLines="1"
             android:text="@string/quick_entry_widget_title"
